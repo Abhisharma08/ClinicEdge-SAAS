@@ -1,0 +1,81 @@
+import {
+    Controller,
+    Get,
+    Post,
+    Put,
+    Delete,
+    Body,
+    Param,
+    Query,
+    HttpCode,
+    HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ClinicsService } from './clinics.service';
+import { CreateClinicDto, UpdateClinicDto } from './dto';
+import { Roles, Public } from '../../common/decorators';
+import { UserRole } from '@prisma/client';
+import { PaginationDto } from '../../common/dto';
+
+@ApiTags('clinics')
+@Controller('clinics')
+export class ClinicsController {
+    constructor(private readonly clinicsService: ClinicsService) { }
+
+    @Post()
+    @Roles(UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Create new clinic (Super Admin only)' })
+    async create(@Body() dto: CreateClinicDto) {
+        return this.clinicsService.create(dto);
+    }
+
+    @Get()
+    @Roles(UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'List all clinics (Super Admin only)' })
+    async findAll(
+        @Query() pagination: PaginationDto,
+        @Query('search') search?: string,
+    ) {
+        return this.clinicsService.findAll(pagination, search);
+    }
+
+    @Get('public')
+    @Public()
+    @ApiOperation({ summary: 'List active clinics for booking (public)' })
+    async listPublic(@Query() pagination: PaginationDto) {
+        return this.clinicsService.findAll(pagination);
+    }
+
+    @Get(':id')
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Get clinic details' })
+    async findOne(@Param('id') id: string) {
+        return this.clinicsService.findById(id);
+    }
+
+    @Get(':id/public')
+    @Public()
+    @ApiOperation({ summary: 'Get clinic public info for booking' })
+    async getPublicInfo(@Param('id') id: string) {
+        return this.clinicsService.getPublicInfo(id);
+    }
+
+    @Put(':id')
+    @Roles(UserRole.SUPER_ADMIN, UserRole.CLINIC_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Update clinic' })
+    async update(@Param('id') id: string, @Body() dto: UpdateClinicDto) {
+        return this.clinicsService.update(id, dto);
+    }
+
+    @Delete(':id')
+    @Roles(UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({ summary: 'Soft delete clinic (Super Admin only)' })
+    async remove(@Param('id') id: string) {
+        return this.clinicsService.softDelete(id);
+    }
+}
