@@ -19,6 +19,7 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', href: '/doctor' },
         { icon: Calendar, label: 'My Schedule', href: '/doctor/schedule' },
+        { icon: Calendar, label: 'Appointments', href: '/doctor/appointments' },
         { icon: Users, label: 'Patients', href: '/doctor/patients' },
         { icon: FileText, label: 'Records', href: '/doctor/records' },
         { icon: Bell, label: 'Notifications', href: '/doctor/notifications' },

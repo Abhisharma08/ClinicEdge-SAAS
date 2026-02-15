@@ -13,7 +13,7 @@ export default function HomePage() {
                             <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
                                 <span className="text-white font-bold text-xl">C</span>
                             </div>
-                            <span className="text-xl font-bold text-gray-900">Clinic Edge</span>
+                            <span className="text-xl font-bold text-gray-900">ClinicEdge</span>
                         </div>
                         <div className="flex items-center space-x-4">
                             <Link href="/login" className="text-gray-600 hover:text-gray-900 font-medium">
@@ -54,7 +54,7 @@ export default function HomePage() {
             <section className="py-20 bg-white">
                 <div className="container mx-auto px-6">
                     <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-                        Why Choose Clinic Edge?
+                        Why Choose ClinicEdge?
                     </h2>
                     <div className="grid md:grid-cols-3 gap-8">
                         <FeatureCard
@@ -96,7 +96,7 @@ export default function HomePage() {
                             Ready to Book Your Appointment?
                         </h2>
                         <p className="text-gray-600 mb-8">
-                            Join thousands of patients who trust Clinic Edge for their healthcare needs.
+                            Join thousands of patients who trust ClinicEdge for their healthcare needs.
                         </p>
                         <Link href="/book" className="btn-primary text-lg px-8 py-4">
                             Get Started
@@ -113,10 +113,10 @@ export default function HomePage() {
                             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                                 <span className="font-bold">C</span>
                             </div>
-                            <span className="font-bold">Clinic Edge</span>
+                            <span className="font-bold">ClinicEdge</span>
                         </div>
                         <p className="text-gray-400 text-sm">
-                            © 2026 Clinic Edge. All rights reserved.
+                            © 2026 ClinicEdge. All rights reserved.
                         </p>
                     </div>
                 </div>

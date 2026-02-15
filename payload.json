@@ -1,0 +1,16 @@
+{
+    "firstName": "Test",
+    "lastName": "Patient",
+    "phone": "+919999999999",
+    "gender": "MALE",
+    "dob": "1990-01-01",
+    "addressLine1": "123 Test St",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "postalCode": "400001",
+    "emergencyName": "Emergency Contact",
+    "emergencyRelationship": "Friend",
+    "emergencyPhone": "+919876543210",
+    "whatsappConsent": true,
+    "dpdpConsent": true
+}

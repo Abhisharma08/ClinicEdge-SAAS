@@ -65,7 +65,7 @@ export default function SuperAdminLayout({
                         <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
                             <span className="text-white font-bold">A</span>
                         </div>
-                        <span className="font-bold text-lg">Clinic Edge</span>
+                        <span className="font-bold text-lg">ClinicEdge</span>
                     </div>
                     <button
                         onClick={() => setSidebarOpen(false)}

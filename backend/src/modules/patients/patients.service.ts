@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { CreatePatientDto, UpdatePatientDto } from './dto';
@@ -7,6 +7,7 @@ import { encrypt, decrypt } from '../../common/utils/encryption.util';
 
 @Injectable()
 export class PatientsService {
+    private readonly logger = new Logger(PatientsService.name);
     private readonly encryptionKey: string;
 
     constructor(
@@ -23,22 +24,64 @@ export class PatientsService {
         });
 
         if (existing) {
+            // Check if patient was soft-deleted and reactivate
+            if (existing.deletedAt) {
+                await this.prisma.patient.update({
+                    where: { id: existing.id },
+                    data: {
+                        deletedAt: null,
+                        isActive: true,
+                        // Optionally update name if provided, to respect new registration details
+                        ...(dto.name && { name: dto.name }),
+                        ...(dto.firstName && { firstName: dto.firstName }),
+                        ...(dto.lastName && { lastName: dto.lastName })
+                    },
+                });
+            }
+
             // Link existing patient to this clinic
             await this.linkToClinic(existing.id, clinicId);
             return existing;
         }
 
+        // Auto-generate `name` from firstName + lastName if not provided
+        const fullName = dto.name || `${dto.firstName} ${dto.lastName}`.trim();
+
         // Create new patient
         const patient = await this.prisma.patient.create({
             data: {
-                name: dto.name,
+                name: fullName,
+                firstName: dto.firstName,
+                lastName: dto.lastName,
                 phone: dto.phone,
                 phoneEncrypted: encrypt(dto.phone, this.encryptionKey),
                 dob: dto.dob ? new Date(dto.dob) : null,
                 dobEncrypted: dto.dob ? encrypt(dto.dob, this.encryptionKey) : null,
                 gender: dto.gender,
+                email: dto.email,
+                bloodGroup: dto.bloodGroup,
+                allergies: dto.allergies,
+                medicalHistory: dto.medicalHistory,
+                // Address
+                addressLine1: dto.addressLine1,
+                addressLine2: dto.addressLine2,
+                city: dto.city,
+                state: dto.state,
+                postalCode: dto.postalCode,
+                country: dto.country || 'India',
+                // Emergency contact
+                emergencyName: dto.emergencyName,
+                emergencyRelationship: dto.emergencyRelationship,
+                emergencyPhone: dto.emergencyPhone,
+                // Nominee
+                nomineeName: dto.nomineeName,
+                nomineeRelationship: dto.nomineeRelationship,
+                nomineePhone: dto.nomineePhone,
+                // Consent
                 whatsappConsent: dto.whatsappConsent || false,
                 consentAt: dto.whatsappConsent ? new Date() : null,
+                dpdpConsent: dto.dpdpConsent || false,
+                dpdpConsentAt: dto.dpdpConsent ? new Date() : null,
             },
         });
 
@@ -48,25 +91,57 @@ export class PatientsService {
         return patient;
     }
 
-    async findByClinic(clinicId: string, pagination: PaginationDto, search?: string) {
-        // Get patient IDs linked to this clinic
-        const patientClinics = await this.prisma.patientClinic.findMany({
-            where: { clinicId },
-            select: { patientId: true },
-        });
-
-        const patientIds = patientClinics.map((pc) => pc.patientId);
-
-        const where = {
-            id: { in: patientIds },
+    async findByClinic(
+        clinicId: string,
+        pagination: PaginationDto,
+        search?: string,
+        fromDate?: string,
+        toDate?: string,
+        gender?: string,
+        bloodGroup?: string,
+        sortBy?: string,
+        sortOrder?: 'asc' | 'desc',
+    ) {
+        const where: any = {
             deletedAt: null,
-            ...(search && {
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' as const } },
-                    { phone: { contains: search } },
-                ],
-            }),
+            patientClinics: { some: { clinicId } },
         };
+
+        if (search) {
+            where.OR = [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { firstName: { contains: search, mode: 'insensitive' as const } },
+                { lastName: { contains: search, mode: 'insensitive' as const } },
+                { phone: { contains: search } },
+                { email: { contains: search, mode: 'insensitive' as const } },
+            ];
+        }
+
+        // Date filters — filter by patient createdAt
+        if (fromDate || toDate) {
+            where.createdAt = {};
+            if (fromDate) where.createdAt.gte = new Date(fromDate);
+            if (toDate) {
+                const end = new Date(toDate);
+                end.setHours(23, 59, 59, 999);
+                where.createdAt.lte = end;
+            }
+        }
+
+        // Gender filter
+        if (gender && ['MALE', 'FEMALE', 'OTHER'].includes(gender.toUpperCase())) {
+            where.gender = gender.toUpperCase();
+        }
+
+        // Blood Group filter
+        if (bloodGroup) {
+            where.bloodGroup = bloodGroup;
+        }
+
+        // Sorting
+        const allowedSortFields = ['firstName', 'lastName', 'createdAt', 'dob', 'city', 'gender', 'phone'];
+        const orderField = sortBy && allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+        const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
 
         const [patients, total] = await Promise.all([
             this.prisma.patient.findMany({
@@ -76,13 +151,20 @@ export class PatientsService {
                 select: {
                     id: true,
                     name: true,
+                    firstName: true,
+                    lastName: true,
                     phone: true,
                     dob: true,
                     gender: true,
+                    email: true,
+                    city: true,
+                    state: true,
+                    bloodGroup: true,
                     whatsappConsent: true,
+                    dpdpConsent: true,
                     createdAt: true,
                 },
-                orderBy: { name: 'asc' },
+                orderBy: { [orderField]: orderDirection },
             }),
             this.prisma.patient.count({ where }),
         ]);
@@ -98,7 +180,7 @@ export class PatientsService {
                     include: { clinic: { select: { name: true } } },
                 },
                 appointments: {
-                    take: 5,
+                    take: 10,
                     orderBy: { appointmentDate: 'desc' },
                     include: {
                         doctor: { select: { name: true } },
@@ -118,16 +200,30 @@ export class PatientsService {
     async update(id: string, dto: UpdatePatientDto) {
         await this.findById(id);
 
-        return this.prisma.patient.update({
-            where: { id },
-            data: {
-                name: dto.name,
-                dob: dto.dob ? new Date(dto.dob) : undefined,
-                gender: dto.gender,
-                whatsappConsent: dto.whatsappConsent,
-                consentAt: dto.whatsappConsent ? new Date() : undefined,
-            },
-        });
+        const data: any = { ...dto };
+
+        // Auto-update `name` if firstName or lastName changed
+        if (dto.firstName || dto.lastName) {
+            const existing = await this.prisma.patient.findUnique({ where: { id }, select: { firstName: true, lastName: true } });
+            const fn = dto.firstName ?? existing?.firstName ?? '';
+            const ln = dto.lastName ?? existing?.lastName ?? '';
+            data.name = `${fn} ${ln}`.trim();
+        }
+
+        if (dto.dob) {
+            data.dob = new Date(dto.dob);
+            data.dobEncrypted = encrypt(dto.dob, this.encryptionKey);
+        }
+
+        if (dto.whatsappConsent !== undefined) {
+            data.consentAt = dto.whatsappConsent ? new Date() : null;
+        }
+
+        if (dto.dpdpConsent !== undefined) {
+            data.dpdpConsentAt = dto.dpdpConsent ? new Date() : null;
+        }
+
+        return this.prisma.patient.update({ where: { id }, data });
     }
 
     async getVisitHistory(patientId: string, clinicId: string, pagination: PaginationDto) {
@@ -173,6 +269,45 @@ export class PatientsService {
         return this.prisma.patient.update({
             where: { id },
             data: { deletedAt: new Date() },
+        });
+    }
+
+    /**
+     * Export all patients for a clinic (for CSV/XLSX export)
+     */
+    async exportAll(clinicId: string) {
+        return this.prisma.patient.findMany({
+            where: {
+                deletedAt: null,
+                patientClinics: { some: { clinicId } },
+            },
+            select: {
+                firstName: true,
+                lastName: true,
+                name: true,
+                phone: true,
+                dob: true,
+                gender: true,
+                email: true,
+                bloodGroup: true,
+                allergies: true,
+                medicalHistory: true,
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                state: true,
+                postalCode: true,
+                country: true,
+                emergencyName: true,
+                emergencyRelationship: true,
+                emergencyPhone: true,
+                nomineeName: true,
+                nomineeRelationship: true,
+                nomineePhone: true,
+                dpdpConsent: true,
+                createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
         });
     }
 }

@@ -64,7 +64,7 @@ export default function LoginPage() {
                         <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
                             <span className="text-white font-bold text-2xl">C</span>
                         </div>
-                        <span className="text-2xl font-bold text-gray-900">Clinic Edge</span>
+                        <span className="text-2xl font-bold text-gray-900">ClinicEdge</span>
                     </Link>
                     <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
                     <p className="text-gray-600">Sign in to your account</p>

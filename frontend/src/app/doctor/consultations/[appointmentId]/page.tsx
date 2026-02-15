@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { ArrowLeft, Plus, Trash2, Save, FileText, Activity } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, FileText, Activity, ClipboardCheck } from 'lucide-react'
 
 // Types based on backend DTOs
 interface PrescriptionItem {
@@ -68,10 +68,22 @@ export default function DoctorConsultationPage() {
         try {
             await api.patch(`/appointments/${appointmentId}/status?status=CONFIRMED`, {})
             alert('Appointment confirmed!')
-            fetchAppointment() // Refresh to update status
+            fetchAppointment()
         } catch (error) {
             console.error(error)
             alert('Failed to confirm appointment')
+        }
+    }
+
+    async function completeOffline() {
+        if (!confirm('Mark this appointment as completed with a written prescription? No digital visit record will be created.')) return
+        try {
+            await api.patch(`/appointments/${appointmentId}/complete-offline`, {})
+            alert('Appointment marked as completed (written prescription).')
+            router.push('/doctor')
+        } catch (error) {
+            console.error(error)
+            alert('Failed to complete appointment')
         }
     }
 
@@ -136,7 +148,9 @@ export default function DoctorConsultationPage() {
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">New Consultation</h1>
                         <p className="text-sm text-gray-500">
-                            {appointment.patient.name} • {appointment.patient.gender} • {appointment.patient.phone}
+                            {appointment.patient.firstName && appointment.patient.lastName
+                                ? `${appointment.patient.firstName} ${appointment.patient.lastName}`
+                                : appointment.patient.name} • {appointment.patient.gender} • {appointment.patient.phone}
                         </p>
                     </div>
                 </div>
@@ -151,8 +165,19 @@ export default function DoctorConsultationPage() {
                     </button>
                 )}
                 {appointment.status === 'CONFIRMED' && (
-                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-                        Confirmed
+                    <div className="flex gap-2">
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                            Confirmed
+                        </span>
+                        <button type="button" onClick={completeOffline}
+                            className="bg-orange-100 text-orange-800 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-200 flex items-center gap-1">
+                            <ClipboardCheck className="w-4 h-4" /> Written Rx Only
+                        </button>
+                    </div>
+                )}
+                {appointment.status === 'COMPLETED_OFFLINE' && (
+                    <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                        Completed (Written Rx)
                     </span>
                 )}
                 {appointment.status === 'COMPLETED' && (
@@ -328,6 +353,15 @@ export default function DoctorConsultationPage() {
                             >
                                 Cancel
                             </button>
+                            {appointment.status === 'CONFIRMED' && (
+                                <button
+                                    type="button"
+                                    onClick={completeOffline}
+                                    className="px-4 py-2 rounded-lg bg-orange-100 text-orange-800 hover:bg-orange-200 flex items-center gap-1 font-medium"
+                                >
+                                    <ClipboardCheck className="w-4 h-4" /> Written Rx
+                                </button>
+                            )}
                             <button
                                 type="submit"
                                 disabled={submitting}

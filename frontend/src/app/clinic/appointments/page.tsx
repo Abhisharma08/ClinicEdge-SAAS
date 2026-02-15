@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Calendar, Plus, Filter, Check, X, Clock, Edit2, Stethoscope, FileText } from 'lucide-react'
+import { Calendar, Plus, Filter, Check, X, Clock, Edit2, Stethoscope, FileText, ClipboardCheck, Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Modal } from '@/components/ui/Modal'
 
@@ -17,6 +17,9 @@ export default function AppointmentsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
+    const [patientSearch, setPatientSearch] = useState('')
+    const [slots, setSlots] = useState<any[]>([])
+    const [loadingSlots, setLoadingSlots] = useState(false)
 
     // Form State
     const [formData, setFormData] = useState({
@@ -47,6 +50,14 @@ export default function AppointmentsPage() {
         }
     }, [statusFilter])
 
+    useEffect(() => {
+        if (isModalOpen && formData.doctorId && formData.appointmentDate && user?.clinicId) {
+            fetchSlots(user.clinicId, formData.doctorId, formData.appointmentDate)
+        } else {
+            setSlots([])
+        }
+    }, [isModalOpen, formData.doctorId, formData.appointmentDate])
+
     async function fetchAppointments(clinicId: string) {
         setLoading(true)
         try {
@@ -70,9 +81,22 @@ export default function AppointmentsPage() {
     async function fetchPatients(clinicId: string) {
         try {
             // Note: /patients endpoint uses clinicId from JWT token
-            const res = await api.get<any>('/patients')
+            const res = await api.get<any>('/patients?limit=200')
             setPatients(res.items)
         } catch (error) { console.error(error) }
+    }
+
+    async function fetchSlots(clinicId: string, doctorId: string, date: string) {
+        setLoadingSlots(true)
+        setSlots([])
+        try {
+            const res = await api.get<any[]>(`/appointments/slots?clinicId=${clinicId}&doctorId=${doctorId}&date=${date}`)
+            setSlots(res || [])
+        } catch (error) {
+            console.error('Failed to load slots', error)
+        } finally {
+            setLoadingSlots(false)
+        }
     }
 
     async function handleStatusChange(id: string, newStatus: string) {
@@ -199,13 +223,13 @@ export default function AppointmentsPage() {
                     >
                         All
                     </button>
-                    {['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].map(status => (
+                    {['PENDING', 'CONFIRMED', 'COMPLETED', 'COMPLETED_OFFLINE', 'CANCELLED'].map(status => (
                         <button
                             key={status}
                             onClick={() => setStatusFilter(status)}
                             className={`px-3 py-1 rounded-full text-sm ${statusFilter === status ? 'bg-primary-100 text-primary-700' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                            {status.charAt(0) + status.slice(1).toLowerCase()}
+                            {status === 'COMPLETED_OFFLINE' ? 'Written Rx' : status.charAt(0) + status.slice(1).toLowerCase()}
                         </button>
                     ))}
                 </div>
@@ -230,7 +254,7 @@ export default function AppointmentsPage() {
                                 appointments.map((apt) => (
                                     <tr key={apt.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 font-medium text-gray-900">
-                                            {apt.patient?.name || 'Unknown'}
+                                            {apt.patient?.firstName && apt.patient?.lastName ? `${apt.patient.firstName} ${apt.patient.lastName}` : apt.patient?.name || 'Unknown'}
                                             <div className="text-xs text-gray-400">{apt.patient?.phone}</div>
                                         </td>
                                         <td className="px-6 py-4 text-gray-600">{apt.doctor?.name}</td>
@@ -241,8 +265,10 @@ export default function AppointmentsPage() {
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium 
                                                 ${apt.status === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
                                                     apt.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                                                        apt.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                {apt.status}
+                                                        apt.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                                                            apt.status === 'COMPLETED_OFFLINE' ? 'bg-orange-100 text-orange-700' :
+                                                                apt.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                {apt.status === 'COMPLETED_OFFLINE' ? 'Written Rx' : apt.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 flex space-x-2">
@@ -255,7 +281,7 @@ export default function AppointmentsPage() {
                                                     <Check className="w-4 h-4" />
                                                 </button>
                                             )}
-                                            {apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED' && (
+                                            {apt.status !== 'CANCELLED' && apt.status !== 'COMPLETED' && apt.status !== 'COMPLETED_OFFLINE' && (
                                                 <>
                                                     <button
                                                         onClick={() => handleEdit(apt)}
@@ -274,13 +300,28 @@ export default function AppointmentsPage() {
                                                 </>
                                             )}
                                             {apt.status === 'CONFIRMED' && (
-                                                <button
-                                                    onClick={() => router.push(`/clinic/consultations/${apt.id}`)}
-                                                    className="p-1 hover:bg-blue-100 text-blue-600 rounded tooltip"
-                                                    title="Start Consultation"
-                                                >
-                                                    <Stethoscope className="w-4 h-4" />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => router.push(`/clinic/consultations/${apt.id}`)}
+                                                        className="p-1 hover:bg-blue-100 text-blue-600 rounded tooltip"
+                                                        title="Start Consultation"
+                                                    >
+                                                        <Stethoscope className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!confirm('Mark as completed with written prescription?')) return
+                                                            try {
+                                                                await api.patch(`/appointments/${apt.id}/complete-offline`, {})
+                                                                if (user?.clinicId) fetchAppointments(user.clinicId)
+                                                            } catch { alert('Failed to update') }
+                                                        }}
+                                                        className="p-1 hover:bg-orange-100 text-orange-600 rounded tooltip"
+                                                        title="Complete (Written Rx)"
+                                                    >
+                                                        <ClipboardCheck className="w-4 h-4" />
+                                                    </button>
+                                                </>
                                             )}
                                         </td>
                                     </tr>
@@ -308,6 +349,16 @@ export default function AppointmentsPage() {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium mb-1">Patient</label>
+                            <div className="relative mb-2">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search patients..."
+                                    className="input w-full pl-9"
+                                    value={patientSearch}
+                                    onChange={e => setPatientSearch(e.target.value)}
+                                />
+                            </div>
                             <select
                                 className="input w-full"
                                 value={formData.patientId}
@@ -315,7 +366,13 @@ export default function AppointmentsPage() {
                                 required
                             >
                                 <option value="">Select Patient</option>
-                                {patients.map(p => <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>)}
+                                {patients
+                                    .filter(p => {
+                                        if (!patientSearch) return true
+                                        const name = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+                                        return name.toLowerCase().includes(patientSearch.toLowerCase()) || (p.phone || '').includes(patientSearch)
+                                    })
+                                    .map(p => <option key={p.id} value={p.id}>{p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})</option>)}
                             </select>
                         </div>
                         <div>
@@ -335,15 +392,34 @@ export default function AppointmentsPage() {
                         <label className="block text-sm font-medium mb-1">Date</label>
                         <input type="date" className="input w-full" value={formData.appointmentDate} onChange={e => setFormData({ ...formData, appointmentDate: e.target.value })} required />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Start Time</label>
-                            <input type="time" className="input w-full" value={formData.startTime} onChange={e => setFormData({ ...formData, startTime: e.target.value })} required />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">End Time</label>
-                            <input type="time" className="input w-full" value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })} />
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Available Slots</label>
+                        {!formData.doctorId || !formData.appointmentDate ? (
+                            <div className="text-sm text-gray-400">Select a doctor and date first</div>
+                        ) : loadingSlots ? (
+                            <div className="text-sm text-gray-500 flex items-center gap-2"><Clock className="w-4 h-4 animate-spin" /> Loading slots...</div>
+                        ) : slots.length === 0 ? (
+                            <div className="text-sm text-red-500">No slots available for this date</div>
+                        ) : (
+                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto p-1">
+                                {slots.map(slot => (
+                                    <button
+                                        key={slot.start}
+                                        type="button"
+                                        disabled={!slot.available}
+                                        onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
+                                        className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${formData.startTime === slot.start
+                                                ? 'bg-primary-600 text-white border-primary-600'
+                                                : slot.available
+                                                    ? 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+                                                    : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        {slot.start}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Notes</label>

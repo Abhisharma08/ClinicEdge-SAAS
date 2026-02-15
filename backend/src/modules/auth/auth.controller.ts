@@ -6,6 +6,7 @@ import {
     HttpStatus,
     UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService, AuthTokens } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -14,7 +15,6 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { Public, CurrentUser, CurrentUserData } from '../../common/decorators';
 
-import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -71,6 +71,7 @@ export class AuthController {
     @Public()
     @Post('forgot-password')
     @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 3, ttl: 3600000 } })
     @ApiOperation({ summary: 'Request password reset' })
     @ApiResponse({ status: 200, description: 'Reset email sent if user exists' })
     async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<void> {

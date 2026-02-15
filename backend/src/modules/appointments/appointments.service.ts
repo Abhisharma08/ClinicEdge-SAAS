@@ -13,6 +13,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAppointmentDto, UpdateAppointmentDto } from './dto';
 import { PublicBookAppointmentDto } from './dto/public-book-appointment.dto';
 import { PatientsService } from '../patients/patients.service';
+import { VisitRecordsService } from '../visit-records/visit-records.service';
 import { PaginationDto, createPaginatedResult } from '../../common/dto';
 import { AppointmentStatus, NotificationType } from '@prisma/client';
 import { parseTime, isFutureDate, hoursBetween } from '../../common/utils/date.util';
@@ -27,6 +28,7 @@ export class AppointmentsService {
         private slotsService: SlotsService,
         private notificationsService: NotificationsService,
         private patientsService: PatientsService,
+        private visitRecordsService: VisitRecordsService,
     ) { }
 
     /**
@@ -200,6 +202,7 @@ export class AppointmentsService {
             ...(filters?.doctorId && { doctorId: filters.doctorId }),
             ...(filters?.patientId && { patientId: filters.patientId }),
             ...(filters?.date && { appointmentDate: new Date(filters.date) }),
+            patient: { deletedAt: null },
         };
 
         const [appointments, total] = await Promise.all([
@@ -286,6 +289,25 @@ export class AppointmentsService {
         if (status === AppointmentStatus.CONFIRMED) {
             await this.notificationsService.sendAppointmentConfirmed(updated);
         } else if (status === AppointmentStatus.COMPLETED) {
+            await this.notificationsService.sendFeedbackRequest(updated);
+        } else if (status === AppointmentStatus.COMPLETED_OFFLINE) {
+            // Create a Visit Record for offline completion so it appears in history
+            try {
+                await this.visitRecordsService.create({
+                    appointmentId: id,
+                    symptoms: 'Completed Offline (Written Rx)',
+                    diagnosis: 'Written Prescription',
+                    notes: 'This appointment was marked as completed offline. A written prescription was provided.',
+                    prescriptions: [],
+                }, appointment.doctorId, appointment.clinicId);
+                this.logger.log(`Created offline visit record for appointment ${id}`);
+            } catch (error) {
+                if (error instanceof ConflictException) {
+                    this.logger.warn(`Visit record already exists for ${id}, skipping creation.`);
+                } else {
+                    this.logger.warn(`Failed to create offline visit record for ${id}`, error);
+                }
+            }
             await this.notificationsService.sendFeedbackRequest(updated);
         }
 
@@ -422,10 +444,12 @@ export class AppointmentsService {
             PENDING: [AppointmentStatus.CONFIRMED, AppointmentStatus.CANCELLED],
             CONFIRMED: [
                 AppointmentStatus.COMPLETED,
+                AppointmentStatus.COMPLETED_OFFLINE,
                 AppointmentStatus.CANCELLED,
                 AppointmentStatus.NO_SHOW,
             ],
             COMPLETED: [],
+            COMPLETED_OFFLINE: [],
             CANCELLED: [],
             NO_SHOW: [],
         };

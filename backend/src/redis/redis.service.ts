@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
     private client: Redis;
+    private readonly logger = new Logger(RedisService.name);
 
     constructor(private configService: ConfigService) { }
 
@@ -13,11 +14,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.client = new Redis(redisUrl);
 
         this.client.on('connect', () => {
-            console.log('✅ Redis connected');
+            this.logger.log('Redis connected');
         });
 
         this.client.on('error', (err) => {
-            console.error('❌ Redis error:', err);
+            this.logger.error('Redis error:', err);
         });
     }
 
@@ -37,7 +38,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         try {
             return JSON.parse(data);
         } catch (error) {
-            console.error(`Error parsing cached slots for key ${key}:`, error);
+            this.logger.error(`Error parsing cached slots for key ${key}:`, error);
             await this.client.del(key); // Clear corrupted cache
             return null;
         }
@@ -53,10 +54,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     async invalidateSlotCache(clinicId: string, doctorId: string, date: string): Promise<void> {
         const pattern = `slots:${clinicId}:${doctorId}:${date}`;
-        const keys = await this.client.keys(pattern);
-        if (keys.length > 0) {
-            await this.client.del(...keys);
-        }
+        await this.delByScan(pattern);
     }
 
     // Rate limiting helpers
@@ -119,9 +117,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     async delPattern(pattern: string): Promise<void> {
-        const keys = await this.client.keys(pattern);
-        if (keys.length > 0) {
-            await this.client.del(...keys);
+        await this.delByScan(pattern);
+    }
+
+    /**
+     * Uses SCAN instead of KEYS to avoid blocking Redis under load.
+     */
+    private async delByScan(pattern: string): Promise<void> {
+        const stream = this.client.scanStream({ match: pattern, count: 100 });
+        for await (const keys of stream) {
+            if (keys.length > 0) {
+                await this.client.del(...keys);
+            }
         }
     }
 }

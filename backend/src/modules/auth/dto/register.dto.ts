@@ -2,13 +2,9 @@ import {
     IsEmail,
     IsString,
     MinLength,
-    IsEnum,
-    IsOptional,
-    IsUUID,
     Matches,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
     @ApiProperty({ example: 'newuser@clinic.com' })
@@ -26,14 +22,4 @@ export class RegisterDto {
         { message: 'Password must contain uppercase, lowercase, number, and special character' }
     )
     password: string;
-
-    @ApiPropertyOptional({ enum: UserRole, default: UserRole.PATIENT })
-    @IsOptional()
-    @IsEnum(UserRole)
-    role?: UserRole;
-
-    @ApiPropertyOptional({ description: 'Clinic ID for clinic-scoped users' })
-    @IsOptional()
-    @IsUUID()
-    clinicId?: string;
 }

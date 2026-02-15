@@ -33,14 +33,7 @@ export class AppointmentsController {
         @Body() dto: CreateAppointmentDto,
         @CurrentUser() user: CurrentUserData,
     ) {
-        try {
-            console.log('Creating appointment with DTO:', JSON.stringify(dto, null, 2));
-            console.log('User:', JSON.stringify(user, null, 2));
-            return await this.appointmentsService.create(dto, user.userId);
-        } catch (error) {
-            console.error('FAILED TO CREATE APPOINTMENT:', error);
-            throw error;
-        }
+        return this.appointmentsService.create(dto, user.userId);
     }
 
     @Post('public')
@@ -87,7 +80,6 @@ export class AppointmentsController {
         @CurrentUser() user: CurrentUserData,
         @Query() pagination: PaginationDto,
     ) {
-        // Get patient ID from user
         const patient = await this.appointmentsService['prisma'].patient.findUnique({
             where: { userId: user.userId },
         });
@@ -146,6 +138,16 @@ export class AppointmentsController {
         @CurrentUser() user: CurrentUserData,
     ) {
         return this.appointmentsService.updateStatus(id, status, user.userId);
+    }
+
+    @Patch(':id/complete-offline')
+    @Roles(UserRole.DOCTOR)
+    @ApiOperation({ summary: 'Mark appointment as completed with written prescription (no digital form)' })
+    async completeOffline(
+        @Param('id') id: string,
+        @CurrentUser() user: CurrentUserData,
+    ) {
+        return this.appointmentsService.updateStatus(id, AppointmentStatus.COMPLETED_OFFLINE, user.userId);
     }
 
     @Put(':id')

@@ -354,7 +354,7 @@ export class NotificationsService {
                         <h2>Appointment Confirmed</h2>
                         <p>Dear ${payload.patientName},</p>
                         <p>Your appointment with <strong>Dr. ${payload.doctorName}</strong> has been confirmed.</p>
-                        <p>Please arrive 10 minutes eary.</p>
+                        <p>Please arrive 10 minutes early.</p>
                     </div>
                 `;
             case NotificationType.FEEDBACK_REQUEST:

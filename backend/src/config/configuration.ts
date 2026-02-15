@@ -13,9 +13,9 @@ export default () => ({
         url: process.env.REDIS_URL || 'redis://localhost:6379',
     },
 
-    // JWT
+    // JWT — no fallback; validated at startup
     jwt: {
-        secret: process.env.JWT_SECRET || 'change-me-in-production',
+        secret: process.env.JWT_SECRET,
         accessExpiry: process.env.JWT_ACCESS_EXPIRY || '24h',
         refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
     },
@@ -36,9 +36,9 @@ export default () => ({
         baseUrl: process.env.INTERAKT_BASE_URL || 'https://api.interakt.ai/v1',
     },
 
-    // Encryption
+    // Encryption — no fallback; validated at startup
     encryption: {
-        key: process.env.ENCRYPTION_KEY || 'default-32-character-key-here!!',
+        key: process.env.ENCRYPTION_KEY,
     },
 
     // Timezone

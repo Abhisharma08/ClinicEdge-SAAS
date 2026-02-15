@@ -166,15 +166,28 @@ export class FeedbackService {
     }
 
     /**
-     * Get feedback analytics for a clinic
+     * Get feedback analytics for a clinic — uses database aggregation
      */
     async getAnalytics(clinicId: string) {
-        const feedbacks = await this.prisma.feedback.findMany({
-            where: { clinicId, submittedAt: { not: null } },
-            select: { rating: true, redirectedToGoogle: true },
-        });
+        const baseWhere = { clinicId, submittedAt: { not: null } };
 
-        const total = feedbacks.length;
+        const [stats, distribution, googleRedirects] = await Promise.all([
+            this.prisma.feedback.aggregate({
+                where: baseWhere,
+                _avg: { rating: true },
+                _count: { _all: true },
+            }),
+            this.prisma.feedback.groupBy({
+                by: ['rating'],
+                where: baseWhere,
+                _count: { _all: true },
+            }),
+            this.prisma.feedback.count({
+                where: { ...baseWhere, redirectedToGoogle: true },
+            }),
+        ]);
+
+        const total = stats._count._all;
         if (total === 0) {
             return {
                 totalFeedback: 0,
@@ -185,22 +198,17 @@ export class FeedbackService {
             };
         }
 
-        const averageRating =
-            feedbacks.reduce((sum, f) => sum + f.rating, 0) / total;
-
-        const ratingDistribution = feedbacks.reduce(
-            (acc, f) => {
-                acc[f.rating] = (acc[f.rating] || 0) + 1;
+        const ratingDistribution = distribution.reduce(
+            (acc, d) => {
+                acc[d.rating] = d._count._all;
                 return acc;
             },
             {} as Record<number, number>,
         );
 
-        const googleRedirects = feedbacks.filter((f) => f.redirectedToGoogle).length;
-
         return {
             totalFeedback: total,
-            averageRating: Math.round(averageRating * 10) / 10,
+            averageRating: Math.round((stats._avg.rating || 0) * 10) / 10,
             ratingDistribution,
             googleRedirects,
             internalFeedback: total - googleRedirects,

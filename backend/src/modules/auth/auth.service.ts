@@ -89,13 +89,12 @@ export class AuthService {
         // Hash password
         const passwordHash = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
 
-        // Create user
+        // Create user — always PATIENT role for public registration
         const user = await this.prisma.user.create({
             data: {
                 email: dto.email,
                 passwordHash,
-                role: dto.role || UserRole.PATIENT,
-                clinicId: dto.clinicId,
+                role: UserRole.PATIENT,
                 isActive: true,
             },
         });
@@ -217,8 +216,8 @@ export class AuthService {
         // Invalidate token
         await this.redisService.del(`password_reset:${dto.token}`);
 
-        // Optional: Invalidate all sessions to force re-login?
-        // await this.logout(userId);
+        // Invalidate all sessions to force re-login after password change
+        await this.logout(userId);
 
         this.logger.log(`Password reset successful for user ${userId}`);
     }

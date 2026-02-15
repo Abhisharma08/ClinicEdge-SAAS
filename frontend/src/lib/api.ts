@@ -36,8 +36,7 @@ class ApiClient {
             headers.Authorization = `Bearer ${token}`
         }
 
-        const res = await fetch(`${API_BASE}/api${endpoint}`, { ...options, headers })
-        console.log(`API DEBUG: ${endpoint} -> ${res.status}`);
+        const res = await fetch(`${API_BASE}/api${endpoint}`, { ...options, headers, cache: 'no-store' })
 
         if (res.status === 401) {
             this.clearToken()
@@ -48,7 +47,8 @@ class ApiClient {
 
         if (!res.ok) {
             const error = await res.json().catch(() => ({ message: 'Request failed' }))
-            throw new Error(error.message)
+            console.error('API Error:', error) // Log full error details for debugging
+            throw new Error(Array.isArray(error.message) ? error.message.join(', ') : error.message)
         }
 
         return res.json()

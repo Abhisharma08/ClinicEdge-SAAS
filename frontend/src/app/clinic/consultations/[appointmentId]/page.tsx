@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
-import { ArrowLeft, Plus, Trash2, Save, FileText, Activity } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, FileText, Activity, ClipboardCheck } from 'lucide-react'
 
 // Types based on backend DTOs
 interface PrescriptionItem {
@@ -102,10 +102,23 @@ export default function ConsultationPage() {
         }
     }
 
+    async function completeOffline() {
+        if (!confirm('Mark this appointment as completed with a written prescription? No digital visit record will be created.')) return
+        try {
+            await api.patch(`/appointments/${appointmentId}/complete-offline`, {})
+            alert('Appointment marked as completed (written prescription).')
+            router.push('/clinic/appointments')
+        } catch (error) {
+            console.error(error)
+            alert('Failed to complete appointment')
+        }
+    }
+
     if (loading) return <div className="p-8 text-center text-gray-500">Loading consultation...</div>
     if (!appointment) return <div className="p-8 text-center text-red-500">Appointment not found</div>
 
-    const isCompleted = appointment.status === 'COMPLETED'
+    const isCompleted = appointment.status === 'COMPLETED' || appointment.status === 'COMPLETED_OFFLINE'
+    const isOffline = appointment.status === 'COMPLETED_OFFLINE'
     const visitRecord = appointment.visitRecord
 
     return (
@@ -122,10 +135,30 @@ export default function ConsultationPage() {
                         {isCompleted ? 'Consultation Details' : 'New Consultation'}
                     </h1>
                     <p className="text-sm text-gray-500">
-                        {appointment.patient.name} • {appointment.patient.gender} • {appointment.patient.phone}
+                        {appointment.patient.firstName && appointment.patient.lastName
+                            ? `${appointment.patient.firstName} ${appointment.patient.lastName}`
+                            : appointment.patient.name} • {appointment.patient.gender} • {appointment.patient.phone}
                     </p>
                 </div>
-                {isCompleted && (
+                {appointment.status === 'CONFIRMED' && (
+                    <div className="ml-auto flex gap-2">
+                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                            Confirmed
+                        </span>
+                        <button type="button" onClick={completeOffline}
+                            className="bg-orange-100 text-orange-800 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-orange-200 flex items-center gap-1">
+                            <ClipboardCheck className="w-4 h-4" /> Written Rx Only
+                        </button>
+                    </div>
+                )}
+                {isOffline && (
+                    <div className="ml-auto">
+                        <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
+                            Completed (Written Rx)
+                        </span>
+                    </div>
+                )}
+                {appointment.status === 'COMPLETED' && (
                     <div className="ml-auto">
                         <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
                             Completed
@@ -137,105 +170,115 @@ export default function ConsultationPage() {
             {isCompleted ? (
                 // READ ONLY VIEW
                 <div className="space-y-6">
-                    <div className="card p-6 space-y-4">
-                        <h2 className="text-lg font-semibold flex items-center text-gray-900 border-b pb-2">
-                            <Activity className="w-5 h-5 mr-2 text-primary-600" />
-                            Clinical Assessment
-                        </h2>
+                    {isOffline ? (
+                        <div className="card p-6 text-center">
+                            <ClipboardCheck className="w-12 h-12 text-orange-400 mx-auto mb-3" />
+                            <p className="text-lg font-medium text-gray-700">This consultation was completed with a written prescription.</p>
+                            <p className="text-sm text-gray-500 mt-1">No digital visit record was created.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="card p-6 space-y-4">
+                                <h2 className="text-lg font-semibold flex items-center text-gray-900 border-b pb-2">
+                                    <Activity className="w-5 h-5 mr-2 text-primary-600" />
+                                    Clinical Assessment
+                                </h2>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-500 mb-1">Symptoms</label>
-                                <p className="text-gray-900 font-medium">{visitRecord?.symptoms || '-'}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-500 mb-1">Diagnosis</label>
-                                <p className="text-gray-900 font-medium">{visitRecord?.diagnosis || '-'}</p>
-                            </div>
-                            <div className="col-span-full">
-                                <label className="block text-sm font-medium text-gray-500 mb-1">Notes</label>
-                                <p className="text-gray-900 whitespace-pre-wrap">{visitRecord?.notes || '-'}</p>
-                            </div>
-                            {visitRecord?.followUpDate && (
-                                <div className="col-span-full">
-                                    <label className="block text-sm font-medium text-gray-500 mb-1">Follow-up Date</label>
-                                    <p className="text-gray-900 font-medium">
-                                        {new Date(visitRecord.followUpDate).toLocaleDateString()}
-                                    </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Symptoms</label>
+                                        <p className="text-gray-900 font-medium">{visitRecord?.symptoms || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Diagnosis</label>
+                                        <p className="text-gray-900 font-medium">{visitRecord?.diagnosis || '-'}</p>
+                                    </div>
+                                    <div className="col-span-full">
+                                        <label className="block text-sm font-medium text-gray-500 mb-1">Notes</label>
+                                        <p className="text-gray-900 whitespace-pre-wrap">{visitRecord?.notes || '-'}</p>
+                                    </div>
+                                    {visitRecord?.followUpDate && (
+                                        <div className="col-span-full">
+                                            <label className="block text-sm font-medium text-gray-500 mb-1">Follow-up Date</label>
+                                            <p className="text-gray-900 font-medium">
+                                                {new Date(visitRecord.followUpDate).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="card p-6 space-y-4">
-                        <h2 className="text-lg font-semibold flex items-center text-gray-900 border-b pb-2">
-                            <FileText className="w-5 h-5 mr-2 text-primary-600" />
-                            Prescriptions
-                        </h2>
-
-                        {!visitRecord?.prescriptions || visitRecord.prescriptions.length === 0 ? (
-                            <p className="text-gray-500 italic">No prescriptions recorded.</p>
-                        ) : (
-                            <div className="bg-white rounded-lg border overflow-hidden">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-gray-50 border-b">
-                                        <tr>
-                                            <th className="px-4 py-2 font-medium text-gray-500">Medication</th>
-                                            <th className="px-4 py-2 font-medium text-gray-500">Dosage</th>
-                                            <th className="px-4 py-2 font-medium text-gray-500">Frequency</th>
-                                            <th className="px-4 py-2 font-medium text-gray-500">Duration</th>
-                                            <th className="px-4 py-2 font-medium text-gray-500">Instructions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y">
-                                        {visitRecord.prescriptions.map((rx: any) => (
-                                            <tr key={rx.id}>
-                                                <td className="px-4 py-3 font-medium text-gray-900">{rx.medication}</td>
-                                                <td className="px-4 py-3 text-gray-600">{rx.dosage}</td>
-                                                <td className="px-4 py-3 text-gray-600">{rx.frequency}</td>
-                                                <td className="px-4 py-3 text-gray-600">{rx.duration}</td>
-                                                <td className="px-4 py-3 text-gray-600">{rx.instructions || '-'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
                             </div>
-                        )}
 
-                        <div className="flex justify-end pt-4">
-                            <button
-                                onClick={async () => {
-                                    try {
-                                        const token = localStorage.getItem('accessToken');
-                                        // Use the Same API_BASE login as the rest of the app (via Next.js rewrites)
-                                        // The rewrite rule is: source: '/api/:path*' -> destination: 'http://localhost:3001/api/v1/:path*'
-                                        const res = await fetch(`/api/visit-records/${visitRecord?.id}/pdf`, {
-                                            headers: {
-                                                'Authorization': `Bearer ${token}`
+                            <div className="card p-6 space-y-4">
+                                <h2 className="text-lg font-semibold flex items-center text-gray-900 border-b pb-2">
+                                    <FileText className="w-5 h-5 mr-2 text-primary-600" />
+                                    Prescriptions
+                                </h2>
+
+                                {!visitRecord?.prescriptions || visitRecord.prescriptions.length === 0 ? (
+                                    <p className="text-gray-500 italic">No prescriptions recorded.</p>
+                                ) : (
+                                    <div className="bg-white rounded-lg border overflow-hidden">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-gray-50 border-b">
+                                                <tr>
+                                                    <th className="px-4 py-2 font-medium text-gray-500">Medication</th>
+                                                    <th className="px-4 py-2 font-medium text-gray-500">Dosage</th>
+                                                    <th className="px-4 py-2 font-medium text-gray-500">Frequency</th>
+                                                    <th className="px-4 py-2 font-medium text-gray-500">Duration</th>
+                                                    <th className="px-4 py-2 font-medium text-gray-500">Instructions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {visitRecord.prescriptions.map((rx: any) => (
+                                                    <tr key={rx.id}>
+                                                        <td className="px-4 py-3 font-medium text-gray-900">{rx.medication}</td>
+                                                        <td className="px-4 py-3 text-gray-600">{rx.dosage}</td>
+                                                        <td className="px-4 py-3 text-gray-600">{rx.frequency}</td>
+                                                        <td className="px-4 py-3 text-gray-600">{rx.duration}</td>
+                                                        <td className="px-4 py-3 text-gray-600">{rx.instructions || '-'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end pt-4">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const token = localStorage.getItem('accessToken');
+                                                // Use the Same API_BASE login as the rest of the app (via Next.js rewrites)
+                                                // The rewrite rule is: source: '/api/:path*' -> destination: 'http://localhost:3001/api/v1/:path*'
+                                                const res = await fetch(`/api/visit-records/${visitRecord?.id}/pdf`, {
+                                                    headers: {
+                                                        'Authorization': `Bearer ${token}`
+                                                    }
+                                                });
+                                                if (!res.ok) throw new Error('Failed to download PDF');
+                                                const blob = await res.blob();
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = `prescription-${visitRecord?.id}.pdf`;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                window.URL.revokeObjectURL(url);
+                                                document.body.removeChild(a);
+                                            } catch (e) {
+                                                console.error(e);
+                                                alert('Failed to download prescription PDF');
                                             }
-                                        });
-                                        if (!res.ok) throw new Error('Failed to download PDF');
-                                        const blob = await res.blob();
-                                        const url = window.URL.createObjectURL(blob);
-                                        const a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = `prescription-${visitRecord?.id}.pdf`;
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        window.URL.revokeObjectURL(url);
-                                        document.body.removeChild(a);
-                                    } catch (e) {
-                                        console.error(e);
-                                        alert('Failed to download prescription PDF');
-                                    }
-                                }}
-                                className="btn-secondary flex items-center"
-                            >
-                                <FileText className="w-4 h-4 mr-2" />
-                                Download Prescription PDF
-                            </button>
-                        </div>
-                    </div>
+                                        }}
+                                        className="btn-secondary flex items-center"
+                                    >
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        Download Prescription PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             ) : (
                 // EDIT MODE (New Consultation)
@@ -378,6 +421,15 @@ export default function ConsultationPage() {
                                 >
                                     Cancel
                                 </button>
+                                {appointment.status === 'CONFIRMED' && (
+                                    <button
+                                        type="button"
+                                        onClick={completeOffline}
+                                        className="px-4 py-2 rounded-lg bg-orange-100 text-orange-800 hover:bg-orange-200 flex items-center gap-1 font-medium"
+                                    >
+                                        <ClipboardCheck className="w-4 h-4" /> Written Rx
+                                    </button>
+                                )}
                                 <button
                                     type="submit"
                                     disabled={submitting}

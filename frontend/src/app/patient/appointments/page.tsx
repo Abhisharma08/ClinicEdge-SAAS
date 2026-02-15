@@ -10,7 +10,7 @@ interface Appointment {
     appointmentDate: string
     startTime: string
     endTime: string
-    status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW'
+    status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'COMPLETED_OFFLINE' | 'CANCELLED' | 'NO_SHOW'
     doctor: {
         name: string
     }
@@ -181,13 +181,18 @@ function StatusBadge({ status }: { status: string }) {
         PENDING: 'bg-yellow-100 text-yellow-800',
         CONFIRMED: 'bg-blue-100 text-blue-800',
         COMPLETED: 'bg-green-100 text-green-800',
+        COMPLETED_OFFLINE: 'bg-orange-100 text-orange-800',
         CANCELLED: 'bg-red-100 text-red-800',
         NO_SHOW: 'bg-gray-100 text-gray-800'
     }
 
+    const labels: Record<string, string> = {
+        COMPLETED_OFFLINE: 'Written Rx',
+    }
+
     return (
         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[status as keyof typeof styles] || 'bg-gray-100'}`}>
-            {status}
+            {labels[status] || status}
         </span>
     )
 }

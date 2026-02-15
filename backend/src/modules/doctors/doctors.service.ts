@@ -182,6 +182,8 @@ export class DoctorsService {
     async getAppointments(doctorId: string, date?: string, upcoming?: boolean, pagination?: PaginationDto) {
         const where: any = {
             doctorId,
+            deletedAt: null,
+            patient: { deletedAt: null },
         };
 
         if (date) {

@@ -132,20 +132,22 @@ export class SlotsService {
         // Check if date is today - filter out past slots
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (date.getTime() === today.getTime()) {
+        const isToday = date.getTime() === today.getTime();
+
+        // Cache the result (shorter TTL for today since availability changes faster)
+        await this.redisService.setCachedSlots(
+            cacheKey,
+            slots as any,
+            isToday ? 60 : this.CACHE_TTL,
+        );
+
+        if (isToday) {
             const currentTime = formatTime(now);
             return slots.map((slot) => ({
                 ...slot,
                 available: slot.available && slot.start > currentTime,
             }));
         }
-
-        // Cache the result
-        await this.redisService.setCachedSlots(
-            cacheKey,
-            slots as any,
-            this.CACHE_TTL,
-        );
 
         return slots;
     }

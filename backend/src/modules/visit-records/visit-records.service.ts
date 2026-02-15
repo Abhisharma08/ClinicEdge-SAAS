@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateVisitRecordDto, CreatePrescriptionDto } from './dto';
@@ -8,6 +8,7 @@ import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class VisitRecordsService {
+    private readonly logger = new Logger(VisitRecordsService.name);
     constructor(
         private prisma: PrismaService,
         private storageService: StorageService,
@@ -67,7 +68,7 @@ export class VisitRecordsService {
                 });
             }
 
-            return await this.prisma.visitRecord.create({
+            const record = await this.prisma.visitRecord.create({
                 data: {
                     appointmentId: dto.appointmentId,
                     patientId: appointment.patientId,
@@ -92,8 +93,16 @@ export class VisitRecordsService {
                     attachments: true,
                 },
             });
+
+            // Update Patient's Last Visit
+            await this.prisma.patientClinic.updateMany({
+                where: { patientId: appointment.patientId, clinicId },
+                data: { lastVisit: new Date() }
+            });
+
+            return record;
         } catch (error) {
-            console.error('FAILED TO CREATE VISIT RECORD:', error);
+            this.logger.error('FAILED TO CREATE VISIT RECORD:', error);
             throw error;
         }
     }
@@ -161,6 +170,22 @@ export class VisitRecordsService {
 
         if (record.doctorId !== doctorId) {
             throw new ForbiddenException('You can only add attachments to your own records');
+        }
+
+        // Validate file type
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+        if (!allowedMimeTypes.includes(file.mimetype)) {
+            throw new BadRequestException(
+                `Invalid file type "${file.mimetype}". Allowed: ${allowedMimeTypes.join(', ')}`,
+            );
+        }
+
+        // Validate file size (max 10MB)
+        const maxSizeBytes = 10 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            throw new BadRequestException(
+                `File size ${(file.size / 1024 / 1024).toFixed(1)}MB exceeds the 10MB limit`,
+            );
         }
 
         // Upload to MinIO

@@ -18,6 +18,8 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { TenantGuard } from './common/guards/tenant.guard';
+import { HealthController } from './common/health.controller';
 import configuration from './config/configuration';
 
 @Module({
@@ -42,10 +44,12 @@ import configuration from './config/configuration';
         NotificationsModule,
         IntegrationsModule,
     ],
+    controllers: [HealthController],
     providers: [
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: JwtAuthGuard },
         { provide: APP_GUARD, useClass: RolesGuard },
+        { provide: APP_GUARD, useClass: TenantGuard },
     ],
 })
 export class AppModule { }
