@@ -1,8 +1,9 @@
 # Build stage
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+RUN apk add --no-cache openssl libc6-compat
 
+WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -15,6 +16,8 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS runner
+
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
