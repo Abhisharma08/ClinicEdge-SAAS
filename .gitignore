@@ -44,3 +44,9 @@ minio_data/
 # Misc
 *.tgz
 .cache/
+
+# Production env (contains secrets)
+.env.production
+
+# Debug scripts
+*.ps1

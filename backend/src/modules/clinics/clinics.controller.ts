@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Put,
+    Patch,
     Delete,
     Body,
     Param,
@@ -60,6 +61,22 @@ export class ClinicsController {
     @ApiOperation({ summary: 'Get clinic public info for booking' })
     async getPublicInfo(@Param('id') id: string) {
         return this.clinicsService.getPublicInfo(id);
+    }
+
+    @Get(':id/settings')
+    @Roles(UserRole.CLINIC_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Get clinic settings' })
+    async getSettings(@Param('id') id: string) {
+        return this.clinicsService.getSettings(id);
+    }
+
+    @Patch(':id/settings')
+    @Roles(UserRole.CLINIC_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Update clinic settings' })
+    async updateSettings(@Param('id') id: string, @Body() settings: Record<string, any>) {
+        return this.clinicsService.updateSettings(id, settings);
     }
 
     @Put(':id')

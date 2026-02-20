@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -15,6 +16,7 @@ import { VisitRecordsModule } from './modules/visit-records/visit-records.module
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -24,6 +26,7 @@ import configuration from './config/configuration';
 
 @Module({
     imports: [
+        ScheduleModule.forRoot(),
         ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
         ThrottlerModule.forRoot([{
             ttl: 60000,
@@ -43,6 +46,7 @@ import configuration from './config/configuration';
         FeedbackModule,
         NotificationsModule,
         IntegrationsModule,
+        CampaignsModule,
     ],
     controllers: [HealthController],
     providers: [

@@ -110,4 +110,44 @@ export class ClinicsService {
 
         return clinic;
     }
+
+    async getSettings(id: string) {
+        const clinic = await this.prisma.clinic.findUnique({
+            where: { id },
+            select: { settings: true },
+        });
+
+        if (!clinic) {
+            throw new NotFoundException('Clinic not found');
+        }
+
+        const defaults = {
+            timezone: 'Asia/Kolkata',
+            slotDuration: 30,
+            bookingAdvanceDays: 30,
+            cancelBeforeHours: 4,
+            notificationsEnabled: true,
+        };
+
+        return { ...defaults, ...(clinic.settings as any || {}) };
+    }
+
+    async updateSettings(id: string, settings: Record<string, any>) {
+        const clinic = await this.prisma.clinic.findUnique({
+            where: { id },
+            select: { settings: true },
+        });
+
+        if (!clinic) {
+            throw new NotFoundException('Clinic not found');
+        }
+
+        const merged = { ...(clinic.settings as any || {}), ...settings };
+
+        return this.prisma.clinic.update({
+            where: { id },
+            data: { settings: merged },
+            select: { settings: true },
+        });
+    }
 }

@@ -1,55 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { api } from '@/lib/api'
-import { Bell, Check, Clock } from 'lucide-react'
+import { Bell, Check, CheckCheck, Clock } from 'lucide-react'
+import { useNotifications } from '@/hooks/useNotifications'
 
-interface Notification {
-    id: string
-    title?: string // Not in payload currently, but maybe useful
-    payload: {
-        message: string
-    }
-    type: string
-    status: string
-    createdAt: string
+function timeAgo(dateStr: string): string {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+    if (seconds < 60) return 'Just now'
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    if (days < 7) return `${days}d ago`
+    return new Date(dateStr).toLocaleDateString()
+}
+
+function isUnread(status: string) {
+    return status !== 'READ'
 }
 
 export default function NotificationsPage() {
-    const [notifications, setNotifications] = useState<Notification[]>([])
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        fetchNotifications()
-    }, [])
-
-    async function fetchNotifications() {
-        setLoading(true)
-        try {
-            const res = await api.get<Notification[]>('/notifications')
-            setNotifications(res)
-        } catch (error) {
-            console.error(error)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    async function handleMarkAsRead(id: string) {
-        try {
-            await api.patch(`/notifications/${id}/read`, {})
-            // Update local state
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, status: 'READ' } : n)
-            )
-        } catch (error) {
-            console.error('Failed to mark as read', error)
-        }
-    }
-
-    function isUnread(status: string) {
-        return status !== 'READ'
-    }
+    const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications()
 
     return (
         <div className="max-w-3xl">
@@ -60,8 +31,19 @@ export default function NotificationsPage() {
                         Updates about appointments and clinic activity
                     </p>
                 </div>
-                <div className="bg-primary-50 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium">
-                    {notifications.filter(n => isUnread(n.status)).length} Unread
+                <div className="flex items-center gap-3">
+                    {unreadCount > 0 && (
+                        <button
+                            onClick={markAllAsRead}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
+                        >
+                            <CheckCheck className="w-4 h-4" />
+                            Mark All Read
+                        </button>
+                    )}
+                    <div className="bg-primary-50 text-primary-700 px-4 py-2 rounded-lg text-sm font-medium">
+                        {unreadCount} Unread
+                    </div>
                 </div>
             </div>
 
@@ -86,16 +68,16 @@ export default function NotificationsPage() {
                             </div>
                             <div className="flex-1">
                                 <p className={`text-base text-gray-900 ${isUnread(notification.status) ? 'font-medium' : ''}`}>
-                                    {notification.payload.message || 'New Notification'}
+                                    {notification.payload?.message || 'New Notification'}
                                 </p>
                                 <div className="mt-1 flex items-center text-sm text-gray-500">
                                     <Clock className="w-3 h-3 mr-1" />
-                                    {new Date(notification.createdAt).toLocaleString()}
+                                    {timeAgo(notification.createdAt)}
                                 </div>
                             </div>
                             {isUnread(notification.status) && (
                                 <button
-                                    onClick={() => handleMarkAsRead(notification.id)}
+                                    onClick={() => markAsRead(notification.id)}
                                     className="p-2 hover:bg-gray-200 rounded-full text-gray-500 tooltip"
                                     title="Mark as read"
                                 >

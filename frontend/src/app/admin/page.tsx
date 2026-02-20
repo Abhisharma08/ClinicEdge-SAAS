@@ -1,8 +1,51 @@
 'use client'
 
-import { Building2, Users, Calendar, TrendingUp } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building2, Users, UserCog, Activity } from 'lucide-react'
+import { api } from '@/lib/api'
+
+interface AdminStats {
+    totalClinics: number
+    totalDoctors: number
+    totalUsers: number
+}
 
 export default function AdminDashboardPage() {
+    const [stats, setStats] = useState<AdminStats | null>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        fetchStats()
+    }, [])
+
+    async function fetchStats() {
+        try {
+            const [clinicsRes, doctorsRes, usersRes] = await Promise.all([
+                api.get<any>('/clinics?limit=1'),
+                api.get<any>('/users?role=DOCTOR&limit=1'),
+                api.get<any>('/users?limit=1'),
+            ])
+
+            setStats({
+                totalClinics: clinicsRes.meta?.total ?? 0,
+                totalDoctors: doctorsRes.meta?.total ?? 0,
+                totalUsers: usersRes.meta?.total ?? 0,
+            })
+        } catch (error) {
+            console.error('Failed to fetch admin stats:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-6">
             <div>
@@ -10,30 +53,24 @@ export default function AdminDashboardPage() {
                 <p className="text-gray-500">Welcome back, Super Admin</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <StatCard
                     title="Total Clinics"
-                    value="2"
+                    value={stats?.totalClinics ?? 0}
                     icon={<Building2 className="w-6 h-6 text-blue-600" />}
                     bg="bg-blue-50"
                 />
                 <StatCard
                     title="Active Doctors"
-                    value="4"
-                    icon={<Users className="w-6 h-6 text-green-600" />}
+                    value={stats?.totalDoctors ?? 0}
+                    icon={<UserCog className="w-6 h-6 text-green-600" />}
                     bg="bg-green-50"
                 />
                 <StatCard
-                    title="Total Appointments"
-                    value="150+"
-                    icon={<Calendar className="w-6 h-6 text-purple-600" />}
+                    title="Total Users"
+                    value={stats?.totalUsers ?? 0}
+                    icon={<Users className="w-6 h-6 text-purple-600" />}
                     bg="bg-purple-50"
-                />
-                <StatCard
-                    title="Platform Revenue"
-                    value="$12k"
-                    icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
-                    bg="bg-orange-50"
                 />
             </div>
 
@@ -73,7 +110,7 @@ export default function AdminDashboardPage() {
     )
 }
 
-function StatCard({ title, value, icon, bg }: { title: string, value: string, icon: React.ReactNode, bg: string }) {
+function StatCard({ title, value, icon, bg }: { title: string, value: number, icon: React.ReactNode, bg: string }) {
     return (
         <div className="card p-6 flex items-center space-x-4">
             <div className={`p-3 rounded-xl ${bg}`}>

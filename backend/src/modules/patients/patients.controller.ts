@@ -70,7 +70,7 @@ export class PatientsController {
     }
 
     @Get('export')
-    @Roles(UserRole.CLINIC_ADMIN)
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.DOCTOR)
     @ApiOperation({ summary: 'Export all patients as CSV' })
     async exportCSV(
         @CurrentUser() user: CurrentUserData,

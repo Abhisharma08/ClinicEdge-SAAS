@@ -89,8 +89,8 @@ export class FeedbackService {
             throw new ConflictException('Feedback has already been submitted');
         }
 
-        // Verify appointment was completed
-        if (feedback.appointment.status !== 'COMPLETED') {
+        // Verify appointment was completed (either online or offline/Written Rx)
+        if (feedback.appointment.status !== 'COMPLETED' && feedback.appointment.status !== 'COMPLETED_OFFLINE') {
             throw new BadRequestException('Feedback can only be submitted for completed appointments');
         }
 

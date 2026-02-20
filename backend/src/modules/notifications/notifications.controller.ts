@@ -23,6 +23,16 @@ export class NotificationsController {
         );
     }
 
+    @Patch('read-all')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.DOCTOR)
+    @ApiOperation({ summary: 'Mark all dashboard notifications as read' })
+    async markAllAsRead(@CurrentUser() user: CurrentUserData) {
+        if (!user.clinicId) {
+            throw new ForbiddenException('User must be associated with a clinic');
+        }
+        return this.notificationsService.markAllAsRead(user.clinicId, user.userId);
+    }
+
     @Patch(':id/read')
     @ApiOperation({ summary: 'Mark notification as read' })
     async markAsRead(@Param('id') id: string) {

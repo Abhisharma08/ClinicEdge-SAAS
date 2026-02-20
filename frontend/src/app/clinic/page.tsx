@@ -47,8 +47,8 @@ export default function ClinicDashboardPage() {
                 completedToday: completedApts.meta.total,
             })
 
-            // Fetch latest appointments
-            const recentRes = await api.get<any>(`/appointments?limit=5`)
+            // Fetch today's appointments for the list
+            const recentRes = await api.get<any>(`/appointments?date=${today}&limit=10`)
 
             setRecentAppointments(recentRes.items.map((apt: any) => ({
                 id: apt.id,

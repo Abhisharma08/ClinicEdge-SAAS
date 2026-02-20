@@ -29,12 +29,17 @@ export class UsersController {
 
     @Get()
     @Roles(UserRole.SUPER_ADMIN, UserRole.CLINIC_ADMIN)
-    @ApiOperation({ summary: 'List users (clinic-scoped)' })
+    @ApiOperation({ summary: 'List users (global for super admin, clinic-scoped for clinic admin)' })
     async listUsers(
         @CurrentUser() user: CurrentUserData,
         @Query() pagination: PaginationDto,
         @Query('role') role?: UserRole,
     ) {
+        // Super Admin sees all users globally
+        if (user.role === UserRole.SUPER_ADMIN) {
+            return this.usersService.findAll(pagination, role);
+        }
+        // Clinic Admin sees clinic-scoped users
         if (!user.clinicId) {
             throw new ForbiddenException('User must be associated with a clinic');
         }

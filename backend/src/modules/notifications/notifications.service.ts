@@ -5,6 +5,15 @@ import { InteraktService } from '../integrations/interakt/interakt.service';
 import { EmailService } from '../integrations/email/email.service';
 import { NotificationType, NotificationChannel, NotificationStatus } from '@prisma/client';
 import { generateSecureToken } from '../../common/utils/encryption.util';
+import {
+    appointmentCreatedEmail,
+    appointmentConfirmedEmail,
+    appointmentReminder24hEmail,
+    appointmentReminder2hEmail,
+    feedbackRequestEmail,
+    doctorNewBookingEmail,
+    AppointmentEmailPayload,
+} from '../integrations/email/email-templates';
 
 @Injectable()
 export class NotificationsService {
@@ -17,6 +26,23 @@ export class NotificationsService {
         private interaktService: InteraktService,
         private emailService: EmailService,
     ) { }
+
+    /**
+     * Check if clinic has notifications enabled (defaults to true)
+     */
+    private async isNotificationsEnabled(clinicId: string): Promise<boolean> {
+        try {
+            const clinic = await this.prisma.clinic.findUnique({
+                where: { id: clinicId },
+                select: { settings: true },
+            });
+            const settings = (clinic?.settings as any) || {};
+            // Default to true if not explicitly set
+            return settings.notificationsEnabled !== false;
+        } catch {
+            return true; // fail-open: send notifications if we can't read settings
+        }
+    }
 
     /**
      * Schedule all notifications for a new appointment
@@ -39,63 +65,94 @@ export class NotificationsService {
             patientPhone: appointment.patient?.phone,
             patientEmail: appointment.patient?.email,
             doctorName: appointment.doctor?.name,
-            clinicName: appointment.clinic?.name, // Ensure clinic name is available
+            clinicName: appointment.clinic?.name,
             clinicAddress: appointment.clinic?.address,
             date: appointmentDate.toISOString().split('T')[0],
             time: `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`,
         };
 
-        // Create notification: Appointment Created (WhatsApp)
-        if (appointment.patient?.whatsappConsent) {
-            await this.createNotification({
-                clinicId: appointment.clinicId,
-                appointmentId: appointment.id,
-                type: NotificationType.APPOINTMENT_CREATED,
-                channel: NotificationChannel.WHATSAPP,
-                scheduledAt: new Date(),
-                payload: commonPayload,
-            });
+        // Check admin notification toggle
+        const enabled = await this.isNotificationsEnabled(appointment.clinicId);
+
+        if (enabled) {
+            // Create notification: Appointment Created (WhatsApp)
+            if (appointment.patient?.whatsappConsent) {
+                await this.createNotification({
+                    clinicId: appointment.clinicId,
+                    appointmentId: appointment.id,
+                    type: NotificationType.APPOINTMENT_CREATED,
+                    channel: NotificationChannel.WHATSAPP,
+                    scheduledAt: new Date(),
+                    payload: commonPayload,
+                });
+            }
+
+            // Create notification: Appointment Created (Email to patient)
+            if (appointment.patient?.email) {
+                await this.createNotification({
+                    clinicId: appointment.clinicId,
+                    appointmentId: appointment.id,
+                    type: NotificationType.APPOINTMENT_CREATED,
+                    channel: NotificationChannel.EMAIL,
+                    scheduledAt: new Date(),
+                    payload: commonPayload,
+                });
+            }
+
+            // Send booking confirmation email to the DOCTOR
+            try {
+                const doctor = await this.prisma.doctor.findUnique({
+                    where: { id: appointment.doctorId },
+                    select: { user: { select: { email: true } } },
+                });
+                if (doctor?.user?.email) {
+                    await this.createNotification({
+                        clinicId: appointment.clinicId,
+                        appointmentId: appointment.id,
+                        type: NotificationType.APPOINTMENT_CREATED,
+                        channel: NotificationChannel.EMAIL,
+                        scheduledAt: new Date(),
+                        payload: {
+                            ...commonPayload,
+                            recipientEmail: doctor.user.email,
+                            recipientType: 'DOCTOR',
+                        },
+                    });
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to send doctor booking email: ${error.message}`);
+            }
+
+            // Schedule 24h reminder (WhatsApp)
+            const reminder24h = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
+            if (reminder24h > new Date() && appointment.patient?.whatsappConsent) {
+                await this.createNotification({
+                    clinicId: appointment.clinicId,
+                    appointmentId: appointment.id,
+                    type: NotificationType.APPOINTMENT_REMINDER_24H,
+                    channel: NotificationChannel.WHATSAPP,
+                    scheduledAt: reminder24h,
+                    payload: commonPayload,
+                });
+            }
+
+            // Schedule 2h reminder
+            const reminder2h = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
+            if (reminder2h > new Date() && appointment.patient?.whatsappConsent) {
+                await this.createNotification({
+                    clinicId: appointment.clinicId,
+                    appointmentId: appointment.id,
+                    type: NotificationType.APPOINTMENT_REMINDER_2H,
+                    channel: NotificationChannel.WHATSAPP,
+                    scheduledAt: reminder2h,
+                    payload: commonPayload,
+                });
+            }
+        } else {
+            this.logger.log(`Notifications disabled for clinic ${appointment.clinicId}, skipping external notifications`);
         }
 
-        // Create notification: Appointment Created (Email) - Always send if email exists
-        if (appointment.patient?.email) {
-            await this.createNotification({
-                clinicId: appointment.clinicId,
-                appointmentId: appointment.id,
-                type: NotificationType.APPOINTMENT_CREATED,
-                channel: NotificationChannel.EMAIL,
-                scheduledAt: new Date(),
-                payload: commonPayload,
-            });
-        }
-
-        // Schedule 24h reminder (WhatsApp Only for now as per preference)
-        const reminder24h = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
-        if (reminder24h > new Date() && appointment.patient?.whatsappConsent) {
-            await this.createNotification({
-                clinicId: appointment.clinicId,
-                appointmentId: appointment.id,
-                type: NotificationType.APPOINTMENT_REMINDER_24H,
-                channel: NotificationChannel.WHATSAPP,
-                scheduledAt: reminder24h,
-                payload: commonPayload,
-            });
-        }
-
-        // Schedule 2h reminder
-        const reminder2h = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
-        if (reminder2h > new Date() && appointment.patient?.whatsappConsent) {
-            await this.createNotification({
-                clinicId: appointment.clinicId,
-                appointmentId: appointment.id,
-                type: NotificationType.APPOINTMENT_REMINDER_2H,
-                channel: NotificationChannel.WHATSAPP,
-                scheduledAt: reminder2h,
-                payload: commonPayload,
-            });
-        }
-
-        // Also create dashboard notification for clinic
+        // Dashboard notifications are ALWAYS created regardless of toggle
         await this.createNotification({
             clinicId: appointment.clinicId,
             appointmentId: appointment.id,
@@ -114,6 +171,12 @@ export class NotificationsService {
      * Send appointment confirmation notification
      */
     async sendAppointmentConfirmed(appointment: any) {
+        const enabled = await this.isNotificationsEnabled(appointment.clinicId);
+        if (!enabled) {
+            this.logger.log(`Notifications disabled for clinic ${appointment.clinicId}, skipping confirmation`);
+            return;
+        }
+
         const payload = {
             patientPhone: appointment.patient?.phone,
             patientName: appointment.patient?.name,
@@ -149,6 +212,12 @@ export class NotificationsService {
      * Send feedback request after appointment completion
      */
     async sendFeedbackRequest(appointment: any) {
+        const enabled = await this.isNotificationsEnabled(appointment.clinicId);
+        if (!enabled) {
+            this.logger.log(`Notifications disabled for clinic ${appointment.clinicId}, skipping feedback request`);
+            return;
+        }
+
         // Generate feedback token
         const feedbackToken = generateSecureToken(32);
         const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -295,14 +364,16 @@ export class NotificationsService {
     private async sendEmailNotification(notification: any) {
         const payload = notification.payload;
 
-        if (!payload.patientEmail) {
-            throw new Error('Patient email is required');
+        // Use recipientEmail if set (for doctor emails), otherwise fall back to patientEmail
+        const recipientEmail = payload.recipientEmail || payload.patientEmail;
+        if (!recipientEmail) {
+            throw new Error('Recipient email is required');
         }
 
-        const subject = this.getEmailSubject(notification.type);
+        const subject = this.getEmailSubject(notification.type, payload.recipientType);
         const html = this.getEmailHtml(notification.type, payload);
 
-        await this.emailService.sendEmail(payload.patientEmail, subject, html);
+        await this.emailService.sendEmail(recipientEmail, subject, html);
 
         await this.prisma.notification.update({
             where: { id: notification.id },
@@ -315,10 +386,10 @@ export class NotificationsService {
         this.logger.log(`Email notification sent: ${notification.id}`);
     }
 
-    private getEmailSubject(type: NotificationType): string {
+    private getEmailSubject(type: NotificationType, recipientType?: string): string {
         switch (type) {
             case NotificationType.APPOINTMENT_CREATED:
-                return 'Appointment Booking Confirmation';
+                return recipientType === 'DOCTOR' ? 'New Appointment Booked With You' : 'Appointment Booking Confirmation';
             case NotificationType.APPOINTMENT_CONFIRMED:
                 return 'Appointment Confirmed';
             case NotificationType.APPOINTMENT_REMINDER_24H:
@@ -333,41 +404,31 @@ export class NotificationsService {
     }
 
     private getEmailHtml(type: NotificationType, payload: any): string {
-        // Simple HTML templates
-        const baseStyles = `font-family: Arial, sans-serif; line-height: 1.6; color: #333;`;
+        const templatePayload: AppointmentEmailPayload = {
+            patientName: payload.patientName || 'Patient',
+            doctorName: payload.doctorName || 'Doctor',
+            clinicName: payload.clinicName || 'Clinic',
+            clinicAddress: payload.clinicAddress,
+            date: payload.date || '',
+            time: payload.time || '',
+            feedbackUrl: payload.feedbackUrl,
+        };
 
         switch (type) {
             case NotificationType.APPOINTMENT_CREATED:
-                return `
-                    <div style="${baseStyles}">
-                        <h2>Appointment Booked</h2>
-                        <p>Dear ${payload.patientName},</p>
-                        <p>Your appointment with <strong>Dr. ${payload.doctorName}</strong> at <strong>${payload.clinicName}</strong> has been booked.</p>
-                        <p><strong>Date:</strong> ${payload.date}</p>
-                        <p><strong>Time:</strong> ${payload.time}</p>
-                        <p>We will confirm your appointment shortly.</p>
-                    </div>
-                `;
+                return payload.recipientType === 'DOCTOR'
+                    ? doctorNewBookingEmail(templatePayload)
+                    : appointmentCreatedEmail(templatePayload);
             case NotificationType.APPOINTMENT_CONFIRMED:
-                return `
-                    <div style="${baseStyles}">
-                        <h2>Appointment Confirmed</h2>
-                        <p>Dear ${payload.patientName},</p>
-                        <p>Your appointment with <strong>Dr. ${payload.doctorName}</strong> has been confirmed.</p>
-                        <p>Please arrive 10 minutes early.</p>
-                    </div>
-                `;
+                return appointmentConfirmedEmail(templatePayload);
+            case NotificationType.APPOINTMENT_REMINDER_24H:
+                return appointmentReminder24hEmail(templatePayload);
+            case NotificationType.APPOINTMENT_REMINDER_2H:
+                return appointmentReminder2hEmail(templatePayload);
             case NotificationType.FEEDBACK_REQUEST:
-                return `
-                    <div style="${baseStyles}">
-                        <h2>How was your visit?</h2>
-                        <p>Dear ${payload.patientName},</p>
-                        <p>Thank you for visiting <strong>${payload.clinicName}</strong>. We'd love to hear your feedback.</p>
-                        <p><a href="${payload.feedbackUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Submit Feedback</a></p>
-                    </div>
-                `;
+                return feedbackRequestEmail(templatePayload);
             default:
-                return `<p>New notification from ${payload.clinicName}</p>`;
+                return appointmentCreatedEmail(templatePayload);
         }
     }
 
@@ -421,7 +482,10 @@ export class NotificationsService {
             where: {
                 clinicId,
                 channel: NotificationChannel.DASHBOARD,
-                ...(userId && { userId }),
+                OR: [
+                    { userId: userId },      // Specific to this user
+                    { userId: null }         // Global for the clinic (Admins)
+                ]
             },
             orderBy: { createdAt: 'desc' },
             take: 50,
@@ -436,5 +500,24 @@ export class NotificationsService {
             where: { id },
             data: { status: NotificationStatus.READ },
         });
+    }
+
+    /**
+     * Mark all unread dashboard notifications as read for a clinic/user
+     */
+    async markAllAsRead(clinicId: string, userId?: string) {
+        const result = await this.prisma.notification.updateMany({
+            where: {
+                clinicId,
+                channel: NotificationChannel.DASHBOARD,
+                status: { not: NotificationStatus.READ },
+                OR: [
+                    { userId: userId },
+                    { userId: null },
+                ],
+            },
+            data: { status: NotificationStatus.READ },
+        });
+        return { updated: result.count };
     }
 }

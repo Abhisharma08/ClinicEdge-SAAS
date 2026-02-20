@@ -14,7 +14,9 @@ import {
     LogOut,
     Menu,
     X,
+    MessageSquare,
 } from 'lucide-react'
+import { useNotifications } from '@/hooks/useNotifications'
 
 interface User {
     id: string
@@ -31,21 +33,20 @@ export default function ClinicDashboardLayout({
     const router = useRouter()
     const [user, setUser] = useState<User | null>(null)
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const { unreadCount } = useNotifications()
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user')
-        if (!storedUser) {
+        const stored = localStorage.getItem('user')
+        if (!stored) {
             router.push('/login')
             return
         }
-
-        const userData = JSON.parse(storedUser)
-        if (userData.role !== 'CLINIC_ADMIN' && userData.role !== 'DOCTOR') {
+        const parsed = JSON.parse(stored)
+        if (parsed.role !== 'CLINIC_ADMIN') {
             router.push('/login')
             return
         }
-
-        setUser(userData)
+        setUser(parsed)
     }, [])
 
     function handleLogout() {
@@ -59,10 +60,17 @@ export default function ClinicDashboardLayout({
         { icon: Calendar, label: 'Appointments', href: '/clinic/appointments' },
         { icon: Users, label: 'Patients', href: '/clinic/patients' },
         { icon: UserCog, label: 'Doctors', href: '/clinic/doctors' },
-        { icon: Bell, label: 'Notifications', href: '/clinic/notifications' },
+        { icon: Bell, label: 'Notifications', href: '/clinic/notifications', badge: unreadCount },
         { icon: Star, label: 'Feedback', href: '/clinic/feedback' },
+        { icon: MessageSquare, label: 'Campaigns', href: '/clinic/campaigns' },
         { icon: Settings, label: 'Settings', href: '/clinic/settings' },
     ]
+
+    if (!user) {
+        return <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -93,10 +101,17 @@ export default function ClinicDashboardLayout({
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                                className="flex items-center justify-between px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors group"
                             >
-                                <item.icon className="w-5 h-5" />
-                                <span>{item.label}</span>
+                                <div className="flex items-center space-x-3">
+                                    <item.icon className="w-5 h-5" />
+                                    <span>{item.label}</span>
+                                </div>
+                                {item.badge && item.badge > 0 ? (
+                                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                        {item.badge}
+                                    </span>
+                                ) : null}
                             </Link>
                         ))}
                     </nav>
@@ -134,7 +149,15 @@ export default function ClinicDashboardLayout({
                         </button>
                     )}
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 ml-auto">
+                        {/* Notification Bell in Header */}
+                        <div className="relative">
+                            <Bell className="w-6 h-6 text-gray-500" />
+                            {unreadCount > 0 && (
+                                <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
+                            )}
+                        </div>
+
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                             <span className="text-primary-600 text-sm font-medium">
                                 {user?.email?.[0]?.toUpperCase() || 'U'}

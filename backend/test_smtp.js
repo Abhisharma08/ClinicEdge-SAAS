@@ -25,7 +25,7 @@ async function main() {
         const info = await transporter.sendMail({
             from: process.env.SMTP_FROM,
             to: process.env.SMTP_USER, // Send to self to test
-            subject: 'Test Email from Clinic Edgle',
+            subject: 'Test Email from ClinicEdge',
             text: 'If you see this, email notifications are working correctly!',
         });
         console.log('✅ Test email sent: ' + info.messageId);

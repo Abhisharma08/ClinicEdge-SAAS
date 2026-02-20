@@ -1,0 +1,17 @@
+﻿=== SMTP CONFIG ===
+  Host: smtp.hostinger.com
+  Port: 465
+  Secure: true
+  User: no-reply@contentifymarketing.com
+  From: ClinicEdge <no-reply@contentifymarketing.com>
+
+=== STEP 1: Verify SMTP connection ===
+  Γ£à SMTP connection OK
+
+=== STEP 2: Send test email ===
+  Γ£à Email sent to contentify01@gmail.com
+  Message ID: <b6984626-1d41-433b-9754-cb2baa88cfc6@contentifymarketing.com>
+  Response: 250 2.0.0 Ok: queued as 4fDgzX2bGxz1xtN
+
+=== DONE ===
+Check the inbox (and spam folder!) of contentify01@gmail.com

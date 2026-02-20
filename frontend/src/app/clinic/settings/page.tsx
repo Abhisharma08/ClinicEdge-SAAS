@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Building2, Clock, Save, Settings, AlertCircle } from 'lucide-react'
+import { Building2, Clock, Save, Settings, AlertCircle, Bell } from 'lucide-react'
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -24,6 +24,7 @@ export default function SettingsPage() {
         slotDuration: 30,
         cancelBeforeHours: 4,
         bookingAdvanceDays: 30,
+        notificationsEnabled: true,
         operatingHours: {} as Record<string, { start: string; end: string; isOpen: boolean }>
     })
 
@@ -61,6 +62,7 @@ export default function SettingsPage() {
                 slotDuration: settings.slotDuration || 30,
                 cancelBeforeHours: settings.cancelBeforeHours || 4,
                 bookingAdvanceDays: settings.bookingAdvanceDays || 30,
+                notificationsEnabled: settings.notificationsEnabled !== false,
                 operatingHours: settings.operatingHours || defaultHours,
             })
 
@@ -103,8 +105,8 @@ export default function SettingsPage() {
                 <button
                     onClick={() => setActiveTab('profile')}
                     className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'profile'
-                            ? 'text-black border-b-2 border-black'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-black border-b-2 border-black'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
@@ -115,13 +117,25 @@ export default function SettingsPage() {
                 <button
                     onClick={() => setActiveTab('hours')}
                     className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'hours'
-                            ? 'text-black border-b-2 border-black'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-black border-b-2 border-black'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <div className="flex items-center gap-2">
                         <Clock size={16} />
                         <span>Operating Hours & Policies</span>
+                    </div>
+                </button>
+                <button
+                    onClick={() => setActiveTab('notifications')}
+                    className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'notifications'
+                        ? 'text-black border-b-2 border-black'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <Bell size={16} />
+                        <span>Notifications</span>
                     </div>
                 </button>
             </div>
@@ -305,6 +319,45 @@ export default function SettingsPage() {
                                 })}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'notifications' && (
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Notification Preferences</h3>
+                        <p className="text-sm text-gray-500">Control email and WhatsApp notifications for appointments, reminders, and feedback requests.</p>
+
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div>
+                                <p className="font-medium text-gray-900">Enable Notifications</p>
+                                <p className="text-sm text-gray-500">
+                                    When enabled, patients and doctors will receive email and WhatsApp notifications for bookings, confirmations, reminders, and feedback requests.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSettingsData({ ...settingsData, notificationsEnabled: !settingsData.notificationsEnabled })}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settingsData.notificationsEnabled ? 'bg-black' : 'bg-gray-300'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settingsData.notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
+                        {!settingsData.notificationsEnabled && (
+                            <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <AlertCircle size={20} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm font-medium text-amber-800">Notifications are disabled</p>
+                                    <p className="text-sm text-amber-700 mt-1">
+                                        Patients will not receive booking confirmations, reminders, or feedback requests via email or WhatsApp. Dashboard notifications will still appear.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

@@ -1,0 +1,28 @@
+﻿
+=== MOST RECENT APPOINTMENT ===
+{
+  "id": "f7d1842a-60d2-4b88-85cc-aa00dc43c191",
+  "status": "COMPLETED_OFFLINE",
+  "createdAt": "2026-02-15T22:34:44.061Z",
+  "patient": {
+    "name": "Abhimanyu Sharma",
+    "email": "contentify01@gmail.com",
+    "phone": "+918700395712",
+    "whatsappConsent": true
+  },
+  "doctor": {
+    "name": "Abhimanyu Sharma"
+  }
+}
+
+=== NOTIFICATIONS FOR THIS APPOINTMENT ===
+  [DASHBOARD] APPOINTMENT_CREATED | status: SENT | email: N/A | error: none | created: Mon Feb 16 2026 04:04:44 GMT+0530 (India Standard Time)
+  [WHATSAPP] APPOINTMENT_CONFIRMED | status: FAILED | email: contentify01@gmail.com | error: Interakt API error: 401 - {"result": false, "message": "Invalid token provided"} | created: Mon Feb 16 2026 04:12:25 GMT+0530 (India Standard Time)
+  [EMAIL] APPOINTMENT_CONFIRMED | status: SENT | email: contentify01@gmail.com | error: none | created: Mon Feb 16 2026 04:12:32 GMT+0530 (India Standard Time)
+  [WHATSAPP] FEEDBACK_REQUEST | status: FAILED | email: contentify01@gmail.com | error: Interakt API error: 401 - {"result": false, "message": "Invalid token provided"} | created: Mon Feb 16 2026 04:12:46 GMT+0530 (India Standard Time)
+  [EMAIL] FEEDBACK_REQUEST | status: SENT | email: contentify01@gmail.com | error: none | created: Mon Feb 16 2026 04:12:52 GMT+0530 (India Standard Time)
+
+=== ALL EMAIL NOTIFICATIONS EVER ===
+  FEEDBACK_REQUEST | SENT | to: contentify01@gmail.com | error: OK | Mon Feb 16 2026 04:12:52 GMT+0530 (India Standard Time)
+  APPOINTMENT_CONFIRMED | SENT | to: contentify01@gmail.com | error: OK | Mon Feb 16 2026 04:12:32 GMT+0530 (India Standard Time)
+  Total: 2

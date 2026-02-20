@@ -62,6 +62,34 @@ export class UsersService {
         return createPaginatedResult(users, total, pagination);
     }
 
+    async findAll(pagination: PaginationDto, role?: UserRole) {
+        const where = {
+            deletedAt: null,
+            ...(role && { role }),
+        };
+
+        const [users, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where,
+                skip: pagination.skip,
+                take: pagination.take,
+                select: {
+                    id: true,
+                    email: true,
+                    role: true,
+                    clinicId: true,
+                    isActive: true,
+                    createdAt: true,
+                    lastLoginAt: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
+            this.prisma.user.count({ where }),
+        ]);
+
+        return createPaginatedResult(users, total, pagination);
+    }
+
     async updateStatus(id: string, isActive: boolean) {
         return this.prisma.user.update({
             where: { id },

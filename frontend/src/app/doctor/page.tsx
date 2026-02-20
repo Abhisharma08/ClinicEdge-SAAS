@@ -25,8 +25,9 @@ export default function DoctorDashboardPage() {
             setProfile(profile)
             const doctorId = profile.id
 
-            // 2. Get Upcoming Appointments
-            const aptRes = await api.get<any>(`/doctors/${doctorId}/appointments?upcoming=true&limit=50`)
+            // 2. Get Today's Appointments
+            const today = new Date().toISOString().split('T')[0]
+            const aptRes = await api.get<any>(`/doctors/${doctorId}/appointments?date=${today}&limit=50`)
             console.log('DASHBOARD DEBUG: Upcoming Appointments Response', aptRes);
             console.log('DASHBOARD DEBUG: Items', aptRes?.items);
 

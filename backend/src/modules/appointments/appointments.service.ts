@@ -105,9 +105,9 @@ export class AppointmentsService {
                         idempotencyKey: dto.idempotencyKey || uuidv4(),
                     },
                     include: {
-                        patient: { select: { name: true, phone: true } },
+                        patient: { select: { name: true, phone: true, email: true, whatsappConsent: true } },
                         doctor: { select: { name: true } },
-                        clinic: { select: { name: true } },
+                        clinic: { select: { name: true, address: true } },
                     },
                 });
 
@@ -279,9 +279,9 @@ export class AppointmentsService {
             where: { id },
             data: { status },
             include: {
-                patient: { select: { name: true, phone: true } },
+                patient: { select: { name: true, phone: true, email: true, whatsappConsent: true } },
                 doctor: { select: { name: true } },
-                clinic: { select: { name: true, googleReviewUrl: true } },
+                clinic: { select: { name: true, address: true, googleReviewUrl: true } },
             },
         });
 
