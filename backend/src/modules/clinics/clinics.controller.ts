@@ -10,6 +10,7 @@ import {
     Query,
     HttpCode,
     HttpStatus,
+    InternalServerErrorException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { ClinicsService } from './clinics.service';
@@ -106,9 +107,14 @@ export class ClinicsController {
     @Delete(':id')
     @Roles(UserRole.SUPER_ADMIN)
     @ApiBearerAuth('JWT-auth')
-    @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Hard delete clinic and all its data (Super Admin only)' })
     async remove(@Param('id') id: string) {
-        return this.clinicsService.hardDelete(id);
+        try {
+            await this.clinicsService.hardDelete(id);
+            return { success: true };
+        } catch (e: any) {
+            console.error('Hard delete error:', e);
+            throw new InternalServerErrorException(e.message || JSON.stringify(e));
+        }
     }
 }

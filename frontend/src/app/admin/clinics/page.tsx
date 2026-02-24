@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Plus, Search, MapPin, Phone, Building2, MoreVertical, Trash2, Edit, Download, ToggleLeft, ToggleRight } from 'lucide-react'
+import { api } from '@/lib/api'
 
 interface Clinic {
     id: string
@@ -29,11 +30,7 @@ export default function ClinicsPage() {
 
     async function fetchClinics() {
         try {
-            const token = localStorage.getItem('accessToken')
-            const res = await fetch('/api/v1/clinics', {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            const data = await res.json()
+            const data = await api.get<any>('/clinics')
             setClinics(data.items || [])
         } catch (error) {
             console.error('Failed to fetch clinics:', error)
@@ -46,14 +43,7 @@ export default function ClinicsPage() {
         if (!confirm('WARNING: Hard Deletion is irreversible. Have you exported the clinic data first? Are you sure you want to completely wipe this clinic and all related users, appointments, and data?')) return
 
         try {
-            const token = localStorage.getItem('accessToken')
-            const res = await fetch(`/api/v1/clinics/${id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            })
-
-            if (!res.ok) throw new Error('Failed to delete clinic')
-
+            await api.delete(`/clinics/${id}`)
             setClinics(clinics.filter(c => c.id !== id))
         } catch (error) {
             console.error('Failed to delete clinic:', error)
@@ -64,7 +54,7 @@ export default function ClinicsPage() {
     async function handleExport(id: string, name: string) {
         try {
             const token = localStorage.getItem('accessToken')
-            const res = await fetch(`/api/v1/clinics/${id}/export`, {
+            const res = await fetch(`/api/clinics/${id}/export`, {
                 headers: { Authorization: `Bearer ${token}` }
             })
             if (!res.ok) throw new Error('Failed to export data')
@@ -88,12 +78,7 @@ export default function ClinicsPage() {
     async function toggleStatus(id: string, currentActive: boolean) {
         if (!confirm(`Are you sure you want to ${currentActive ? 'suspend' : 'activate'} this clinic?`)) return
         try {
-            const token = localStorage.getItem('accessToken')
-            const res = await fetch(`/api/v1/clinics/${id}/status?isActive=${!currentActive}`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (!res.ok) throw new Error('Failed to update status')
+            await api.patch(`/clinics/${id}/status?isActive=${!currentActive}`, {})
             fetchClinics()
         } catch (error) {
             console.error('Failed to update clinic status:', error)
@@ -188,9 +173,9 @@ export default function ClinicsPage() {
                                     >
                                         {clinic.isActive ? <ToggleRight className="w-5 h-5 text-green-600" /> : <ToggleLeft className="w-5 h-5 text-gray-400" />}
                                     </button>
-                                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit Clinic">
+                                    <Link href={`/admin/clinics/${clinic.id}`} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit Clinic">
                                         <Edit className="w-5 h-5" />
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={() => handleDelete(clinic.id)}
                                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

@@ -63,7 +63,11 @@ class ApiClient {
 
             // Standard error string
             const errorMsg = error.error?.message || error.message;
-            throw new Error(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg)
+            throw new Error(Array.isArray(errorMsg) ? JSON.stringify(errorMsg) : errorMsg)
+        }
+
+        if (res.status === 204) {
+            return {} as T
         }
 
         return res.json()

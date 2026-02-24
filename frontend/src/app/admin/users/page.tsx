@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { Users, Shield, ShieldCheck, ShieldAlert, Search, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
+import { Users, Shield, ShieldCheck, ShieldAlert, Search, ToggleLeft, ToggleRight, Trash2, Edit } from 'lucide-react'
 
 interface UserItem {
     id: string
@@ -31,8 +31,7 @@ export default function AdminUsersPage() {
     async function fetchUsers() {
         setLoading(true)
         try {
-            const skip = (page - 1) * limit
-            let url = `/users?skip=${skip}&take=${limit}`
+            let url = `/users?page=${page}&limit=${limit}`
             if (roleFilter) url += `&role=${roleFilter}`
             const res = await api.get<any>(url)
             setUsers(res.items || [])
@@ -173,6 +172,13 @@ export default function AdminUsersPage() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
+                                                <Link
+                                                    href={`/admin/users/${user.id}`}
+                                                    className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                                                    title="Edit user"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </Link>
                                                 <button
                                                     onClick={() => toggleStatus(user.id, user.isActive)}
                                                     className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"

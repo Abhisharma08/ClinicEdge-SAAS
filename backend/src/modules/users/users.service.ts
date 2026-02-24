@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { PaginationDto, createPaginatedResult } from '../../common/dto';
-import { CreateUserDto } from './dto';
+import { CreateUserDto, UpdateUserDto } from './dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -125,6 +125,30 @@ export class UsersService {
         ]);
 
         return createPaginatedResult(users, total, pagination);
+    }
+
+    async update(id: string, dto: UpdateUserDto) {
+        await this.findById(id);
+
+        const updateData: any = { ...dto };
+        if (dto.password) {
+            updateData.passwordHash = await bcrypt.hash(dto.password, 12);
+            delete updateData.password;
+        }
+
+        return this.prisma.user.update({
+            where: { id },
+            data: updateData,
+            select: {
+                id: true,
+                email: true,
+                role: true,
+                clinicId: true,
+                isActive: true,
+                createdAt: true,
+                lastLoginAt: true,
+            }
+        });
     }
 
     async updateStatus(id: string, isActive: boolean) {

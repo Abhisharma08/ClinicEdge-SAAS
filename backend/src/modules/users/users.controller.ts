@@ -4,6 +4,7 @@ import {
     Param,
     Query,
     Patch,
+    Put,
     Post,
     Body,
     Delete,
@@ -13,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { UsersService } from './users.service';
-import { CreateUserDto } from './dto';
+import { CreateUserDto, UserListQueryDto, UpdateUserDto } from './dto';
 import { Roles, CurrentUser, CurrentUserData } from '../../common/decorators';
 import { UserRole } from '@prisma/client';
 import { PaginationDto } from '../../common/dto';
@@ -63,18 +64,17 @@ export class UsersController {
     @ApiOperation({ summary: 'List users (global for super admin, clinic-scoped for clinic admin)' })
     async listUsers(
         @CurrentUser() user: CurrentUserData,
-        @Query() pagination: PaginationDto,
-        @Query('role') role?: UserRole,
+        @Query() query: UserListQueryDto,
     ) {
         // Super Admin sees all users globally
         if (user.role === UserRole.SUPER_ADMIN) {
-            return this.usersService.findAll(pagination, role);
+            return this.usersService.findAll(query, query.role);
         }
         // Clinic Admin sees clinic-scoped users
         if (!user.clinicId) {
             throw new ForbiddenException('User must be associated with a clinic');
         }
-        return this.usersService.findByClinic(user.clinicId, pagination, role);
+        return this.usersService.findByClinic(user.clinicId, query, query.role);
     }
 
     @Get(':id')
@@ -82,6 +82,20 @@ export class UsersController {
     @ApiOperation({ summary: 'Get user by ID' })
     async getUser(@Param('id') id: string) {
         return this.usersService.findById(id);
+    }
+
+    @Put(':id')
+    @Roles(UserRole.SUPER_ADMIN, UserRole.CLINIC_ADMIN)
+    @ApiOperation({ summary: 'Update user' })
+    async updateUser(
+        @Param('id') id: string,
+        @Body() dto: UpdateUserDto,
+        @CurrentUser() user: CurrentUserData,
+    ) {
+        if (user.role === UserRole.CLINIC_ADMIN && dto.clinicId && dto.clinicId !== user.clinicId) {
+            throw new ForbiddenException('Cannot reassign to a different clinic');
+        }
+        return this.usersService.update(id, dto);
     }
 
     @Patch(':id/status')
@@ -96,9 +110,9 @@ export class UsersController {
 
     @Delete(':id')
     @Roles(UserRole.SUPER_ADMIN, UserRole.CLINIC_ADMIN)
-    @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Soft delete user' })
     async deleteUser(@Param('id') id: string) {
-        return this.usersService.softDelete(id);
+        await this.usersService.softDelete(id);
+        return { success: true };
     }
 }

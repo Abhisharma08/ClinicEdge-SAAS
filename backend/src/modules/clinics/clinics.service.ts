@@ -125,12 +125,56 @@ export class ClinicsService {
             await tx.appointment.deleteMany({ where: { clinicId: id } });
             await tx.patientClinic.deleteMany({ where: { clinicId: id } });
             await tx.doctorClinic.deleteMany({ where: { clinicId: id } });
+
+            // Fetch complex relations to handle constraints
+            const specialists = await tx.specialist.findMany({ where: { clinicId: id }, select: { id: true } });
+            const specialistIds = specialists.map(s => s.id);
+
+            const clinicUsers = await tx.user.findMany({ where: { clinicId: id }, select: { id: true } });
+            const clinicUserIds = clinicUsers.map(u => u.id);
+
+            const doctors = await tx.doctor.findMany({ where: { userId: { in: clinicUserIds } }, select: { id: true } });
+            const doctorIds = doctors.map(d => d.id);
+
+            const patients = await tx.patient.findMany({ where: { userId: { in: clinicUserIds } }, select: { id: true } });
+            const patientIds = patients.map(p => p.id);
+
+            // Prune DoctorSpecialist links
+            const dsOr: any[] = [];
+            if (specialistIds.length > 0) dsOr.push({ specialistId: { in: specialistIds } });
+            if (doctorIds.length > 0) dsOr.push({ doctorId: { in: doctorIds } });
+            if (dsOr.length > 0) {
+                await tx.doctorSpecialist.deleteMany({ where: { OR: dsOr } });
+            }
+
+            // Prune external Doctor dependencies before deleting their global profile
+            if (doctorIds.length > 0) {
+                await tx.doctorClinic.deleteMany({ where: { doctorId: { in: doctorIds } } });
+                await tx.visitRecord.deleteMany({ where: { doctorId: { in: doctorIds } } });
+                await tx.appointment.deleteMany({ where: { doctorId: { in: doctorIds } } });
+            }
+
+            // Prune external Patient dependencies before deleting their global profile
+            if (patientIds.length > 0) {
+                await tx.patientClinic.deleteMany({ where: { patientId: { in: patientIds } } });
+                await tx.feedback.deleteMany({ where: { patientId: { in: patientIds } } });
+                await tx.visitRecord.deleteMany({ where: { patientId: { in: patientIds } } });
+                await tx.appointment.deleteMany({ where: { patientId: { in: patientIds } } });
+            }
+
+            // Now delete global profiles tied to clinic-bound users
+            if (clinicUserIds.length > 0) {
+                await tx.notification.deleteMany({ where: { userId: { in: clinicUserIds } } });
+                await tx.auditLog.deleteMany({ where: { userId: { in: clinicUserIds } } });
+                await tx.doctor.deleteMany({ where: { userId: { in: clinicUserIds } } });
+                await tx.patient.deleteMany({ where: { userId: { in: clinicUserIds } } });
+            }
+
+            // Now delete the Specialists
             await tx.specialist.deleteMany({ where: { clinicId: id } });
 
-            // Delete Clinic Admin users
+            // Finally delete the users and the actual clinic
             await tx.user.deleteMany({ where: { clinicId: id } });
-
-            // Delete actual clinic
             return tx.clinic.delete({ where: { id } });
         });
     }

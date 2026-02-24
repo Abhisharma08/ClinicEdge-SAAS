@@ -13,6 +13,7 @@ interface AdminStats {
 export default function AdminDashboardPage() {
     const [stats, setStats] = useState<AdminStats | null>(null)
     const [loading, setLoading] = useState(true)
+    const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
     useEffect(() => {
         fetchStats()
@@ -21,18 +22,21 @@ export default function AdminDashboardPage() {
     async function fetchStats() {
         try {
             const [clinicsRes, doctorsRes, usersRes] = await Promise.all([
-                api.get<any>('/v1/clinics?limit=1'),
-                api.get<any>('/v1/users?role=DOCTOR&limit=1'),
-                api.get<any>('/v1/users?limit=1'),
+                api.get<any>('/clinics?limit=1'),
+                api.get<any>('/users?role=DOCTOR&limit=1'),
+                api.get<any>('/users?limit=1'),
             ])
+
+            console.log('Admin Stats Payload:', { clinicsRes, doctorsRes, usersRes })
 
             setStats({
                 totalClinics: clinicsRes.meta?.total ?? 0,
                 totalDoctors: doctorsRes.meta?.total ?? 0,
                 totalUsers: usersRes.meta?.total ?? 0,
             })
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to fetch admin stats:', error)
+            setErrorMsg(error.message || JSON.stringify(error))
         } finally {
             setLoading(false)
         }
@@ -50,6 +54,7 @@ export default function AdminDashboardPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+                {errorMsg && <div className="p-4 bg-red-100 text-red-800 break-all border border-red-300 rounded mb-4 mt-2">API Error: {errorMsg}</div>}
                 <p className="text-gray-500">Welcome back, Super Admin</p>
             </div>
 
