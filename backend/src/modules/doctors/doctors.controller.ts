@@ -106,6 +106,6 @@ export class DoctorsController {
         @Param('id') id: string,
         @Query() query: GetAppointmentsDto,
     ) {
-        return this.doctorsService.getAppointments(id, query.date, query.upcoming, query);
+        return this.doctorsService.getAppointments(id, query.date, query.upcoming, query.status, query);
     }
 }

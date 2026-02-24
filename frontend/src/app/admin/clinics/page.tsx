@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Search, MapPin, Phone, Building2, MoreVertical, Trash2, Edit } from 'lucide-react'
+import { Plus, Search, MapPin, Phone, Building2, MoreVertical, Trash2, Edit, Download, ToggleLeft, ToggleRight } from 'lucide-react'
 
 interface Clinic {
     id: string
@@ -30,7 +30,7 @@ export default function ClinicsPage() {
     async function fetchClinics() {
         try {
             const token = localStorage.getItem('accessToken')
-            const res = await fetch('/api/clinics', {
+            const res = await fetch('/api/v1/clinics', {
                 headers: { Authorization: `Bearer ${token}` }
             })
             const data = await res.json()
@@ -43,11 +43,11 @@ export default function ClinicsPage() {
     }
 
     async function handleDelete(id: string) {
-        if (!confirm('Are you sure you want to delete this clinic? This action cannot be undone.')) return
+        if (!confirm('WARNING: Hard Deletion is irreversible. Have you exported the clinic data first? Are you sure you want to completely wipe this clinic and all related users, appointments, and data?')) return
 
         try {
             const token = localStorage.getItem('accessToken')
-            const res = await fetch(`/api/clinics/${id}`, {
+            const res = await fetch(`/api/v1/clinics/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` }
             })
@@ -58,6 +58,46 @@ export default function ClinicsPage() {
         } catch (error) {
             console.error('Failed to delete clinic:', error)
             alert('Failed to delete clinic')
+        }
+    }
+
+    async function handleExport(id: string, name: string) {
+        try {
+            const token = localStorage.getItem('accessToken')
+            const res = await fetch(`/api/v1/clinics/${id}/export`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (!res.ok) throw new Error('Failed to export data')
+            const data = await res.json()
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `clinic-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-export.json`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+        } catch (error) {
+            console.error('Failed to export clinic data:', error)
+            alert('Failed to export data. Please try again later.')
+        }
+    }
+
+    async function toggleStatus(id: string, currentActive: boolean) {
+        if (!confirm(`Are you sure you want to ${currentActive ? 'suspend' : 'activate'} this clinic?`)) return
+        try {
+            const token = localStorage.getItem('accessToken')
+            const res = await fetch(`/api/v1/clinics/${id}/status?isActive=${!currentActive}`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (!res.ok) throw new Error('Failed to update status')
+            fetchClinics()
+        } catch (error) {
+            console.error('Failed to update clinic status:', error)
+            alert('Failed to update clinic status')
         }
     }
 
@@ -134,12 +174,27 @@ export default function ClinicsPage() {
                                     </span>
                                 </div>
                                 <div className="flex space-x-2">
-                                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                    <button
+                                        onClick={() => handleExport(clinic.id, clinic.name)}
+                                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                        title="Export Clinic Data"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={() => toggleStatus(clinic.id, clinic.isActive)}
+                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title={clinic.isActive ? "Suspend Clinic" : "Activate Clinic"}
+                                    >
+                                        {clinic.isActive ? <ToggleRight className="w-5 h-5 text-green-600" /> : <ToggleLeft className="w-5 h-5 text-gray-400" />}
+                                    </button>
+                                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit Clinic">
                                         <Edit className="w-5 h-5" />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(clinic.id)}
                                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Hard Delete Clinic"
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </button>

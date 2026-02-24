@@ -21,9 +21,9 @@ export default function AdminDashboardPage() {
     async function fetchStats() {
         try {
             const [clinicsRes, doctorsRes, usersRes] = await Promise.all([
-                api.get<any>('/clinics?limit=1'),
-                api.get<any>('/users?role=DOCTOR&limit=1'),
-                api.get<any>('/users?limit=1'),
+                api.get<any>('/v1/clinics?limit=1'),
+                api.get<any>('/v1/users?role=DOCTOR&limit=1'),
+                api.get<any>('/v1/users?limit=1'),
             ])
 
             setStats({

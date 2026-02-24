@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { PaginationDto, createPaginatedResult } from '../../common/dto';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
+import { UserRole, AppointmentStatus } from '@prisma/client';
 import { CreateDoctorDto, UpdateDoctorDto } from './dto';
 
 @Injectable()
@@ -179,12 +179,16 @@ export class DoctorsService {
         return updated.schedule;
     }
 
-    async getAppointments(doctorId: string, date?: string, upcoming?: boolean, pagination?: PaginationDto) {
+    async getAppointments(doctorId: string, date?: string, upcoming?: boolean, status?: AppointmentStatus, pagination?: PaginationDto) {
         const where: any = {
             doctorId,
             deletedAt: null,
             patient: { deletedAt: null },
         };
+
+        if (status) {
+            where.status = status;
+        }
 
         if (date) {
             const searchDate = new Date(date);

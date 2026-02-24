@@ -80,12 +80,58 @@ export class ClinicsService {
         });
     }
 
-    async softDelete(id: string) {
+    async updateStatus(id: string, isActive: boolean) {
         await this.findById(id);
 
         return this.prisma.clinic.update({
             where: { id },
-            data: { deletedAt: new Date(), isActive: false },
+            data: { isActive },
+        });
+    }
+
+    async exportData(id: string) {
+        const clinicData = await this.prisma.clinic.findUnique({
+            where: { id },
+            include: {
+                users: true,
+                doctorClinics: { include: { doctor: true } },
+                specialists: true,
+                patientClinics: { include: { patient: true } },
+                appointments: { include: { visitRecord: true, feedback: true } },
+                notifications: true,
+                auditLogs: true,
+            },
+        });
+
+        if (!clinicData) {
+            throw new NotFoundException('Clinic not found');
+        }
+
+        return clinicData;
+    }
+
+    async hardDelete(id: string) {
+        await this.findById(id);
+
+        return this.prisma.$transaction(async (tx) => {
+            // Unbind relations with no cascade
+            await tx.auditLog.deleteMany({ where: { clinicId: id } });
+            await tx.notification.deleteMany({ where: { clinicId: id } });
+            await tx.feedback.deleteMany({ where: { clinicId: id } });
+
+            // Delete VisitRecords associated with this clinic
+            await tx.visitRecord.deleteMany({ where: { clinicId: id } });
+
+            await tx.appointment.deleteMany({ where: { clinicId: id } });
+            await tx.patientClinic.deleteMany({ where: { clinicId: id } });
+            await tx.doctorClinic.deleteMany({ where: { clinicId: id } });
+            await tx.specialist.deleteMany({ where: { clinicId: id } });
+
+            // Delete Clinic Admin users
+            await tx.user.deleteMany({ where: { clinicId: id } });
+
+            // Delete actual clinic
+            return tx.clinic.delete({ where: { id } });
         });
     }
 

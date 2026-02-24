@@ -1,0 +1,60 @@
+   ▲ Next.js 14.1.0
+   - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/32) ...
+   Generating static pages (8/32) 
+   Generating static pages (16/32) 
+   Generating static pages (24/32) 
+ ✓ Generating static pages (32/32) 
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                Size     First Load JS
+┌ ○ /                                      2.89 kB        94.3 kB
+├ ○ /_not-found                            882 B          85.1 kB
+├ ○ /admin                                 2.82 kB          87 kB
+├ ○ /admin/clinics                         3.04 kB        94.5 kB
+├ ○ /admin/clinics/new                     1.85 kB        93.3 kB
+├ ○ /admin/settings                        2.64 kB        86.8 kB
+├ ○ /admin/users                           3.38 kB        94.8 kB
+├ ○ /admin/users/new                       1.92 kB        93.3 kB
+├ ○ /book                                  3.85 kB          88 kB
+├ ○ /clinic                                3.29 kB        87.5 kB
+├ ○ /clinic/appointments                   5.24 kB        89.4 kB
+├ ○ /clinic/campaigns                      244 B          88.6 kB
+├ λ /clinic/consultations/[appointmentId]  4.76 kB        88.9 kB
+├ ○ /clinic/doctors                        3.66 kB        87.8 kB
+├ ○ /clinic/feedback                       2.06 kB        86.2 kB
+├ ○ /clinic/notifications                  2.93 kB        87.1 kB
+├ ○ /clinic/patients                       9.49 kB        93.7 kB
+├ λ /clinic/patients/[id]                  4.2 kB         88.4 kB
+├ ○ /clinic/settings                       4.64 kB        88.8 kB
+├ ○ /clinic/specialists                    3.67 kB        87.8 kB
+├ ○ /doctor                                4.67 kB        88.8 kB
+├ ○ /doctor/appointments                   5.57 kB        89.7 kB
+├ ○ /doctor/campaigns                      245 B          88.6 kB
+├ λ /doctor/consultations/[appointmentId]  4.43 kB        88.6 kB
+├ ○ /doctor/notifications                  2.91 kB        87.1 kB
+├ ○ /doctor/patients                       9.49 kB        93.7 kB
+├ λ /doctor/patients/[id]                  4.2 kB         88.4 kB
+├ ○ /doctor/profile                        2.6 kB         86.8 kB
+├ ○ /doctor/records                        2.46 kB        93.9 kB
+├ ○ /doctor/schedule                       3.4 kB         87.6 kB
+├ λ /feedback/[token]                      4.38 kB        88.6 kB
+├ ○ /forgot-password                       1.62 kB          93 kB
+├ ○ /login                                 1.97 kB        93.4 kB
+├ ○ /patient/appointments                  2.58 kB          94 kB
+└ ○ /reset-password                        1.96 kB        93.4 kB
++ First Load JS shared by all              84.2 kB
+  ├ chunks/69-067eed30cc1a1500.js          28.9 kB
+  ├ chunks/fd9d1056-22a8115f3ca18d53.js    53.4 kB
+  └ other shared chunks (total)            1.9 kB
+
+
+○  (Static)   prerendered as static content
+λ  (Dynamic)  server-rendered on demand using Node.js
+

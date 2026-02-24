@@ -87,12 +87,28 @@ export class ClinicsController {
         return this.clinicsService.update(id, dto);
     }
 
+    @Patch(':id/status')
+    @Roles(UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Suspend or activate clinic (Super Admin only)' })
+    async updateStatus(@Param('id') id: string, @Query('isActive') isActive: string) {
+        return this.clinicsService.updateStatus(id, isActive === 'true');
+    }
+
+    @Get(':id/export')
+    @Roles(UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Export full clinic data payload (Super Admin only)' })
+    async exportData(@Param('id') id: string) {
+        return this.clinicsService.exportData(id);
+    }
+
     @Delete(':id')
     @Roles(UserRole.SUPER_ADMIN)
     @ApiBearerAuth('JWT-auth')
     @HttpCode(HttpStatus.NO_CONTENT)
-    @ApiOperation({ summary: 'Soft delete clinic (Super Admin only)' })
+    @ApiOperation({ summary: 'Hard delete clinic and all its data (Super Admin only)' })
     async remove(@Param('id') id: string) {
-        return this.clinicsService.softDelete(id);
+        return this.clinicsService.hardDelete(id);
     }
 }
