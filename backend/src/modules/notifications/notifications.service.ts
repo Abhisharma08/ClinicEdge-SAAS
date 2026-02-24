@@ -352,8 +352,41 @@ export class NotificationsService {
             });
             this.logger.log(`WhatsApp notification sent: ${notification.id}`);
         } catch (err) {
-            // If WhatsApp fails, maybe try to schedule Email fallback if not already scheduled?
-            // For now just log error
+            this.logger.warn(`WhatsApp notification failed for ${notification.id}. Attempting Email fallback. Error: ${err.message}`);
+
+            // Mark the WhatsApp attempt as failed
+            await this.updateNotificationStatus(
+                notification.id,
+                NotificationStatus.FAILED,
+                err.message,
+            );
+
+            // Fallback to Email if patient has an email address
+            if (payload.patientEmail || payload.recipientEmail) {
+                try {
+                    // Create a new notification record for the email fallback to maintain audit history
+                    const emailNotification = await this.prisma.notification.create({
+                        data: {
+                            clinicId: notification.clinicId,
+                            appointmentId: notification.appointmentId,
+                            userId: notification.userId,
+                            type: notification.type,
+                            channel: NotificationChannel.EMAIL,
+                            status: NotificationStatus.PENDING,
+                            scheduledAt: new Date(),
+                            payload: notification.payload,
+                        },
+                    });
+
+                    this.logger.log(`Executing email fallback for notification ${emailNotification.id}`);
+                    await this.sendEmailNotification(emailNotification);
+                } catch (fallbackErr) {
+                    this.logger.error(`Email fallback also failed for original notification ${notification.id}:`, fallbackErr);
+                }
+            } else {
+                this.logger.warn(`Cannot fallback to Email for notification ${notification.id}: No email address available.`);
+            }
+
             throw err;
         }
     }

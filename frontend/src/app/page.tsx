@@ -1,7 +1,32 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, Users, Clock, Shield, Star, ArrowRight } from 'lucide-react'
+import { api } from '@/lib/api'
+
+interface Stats {
+    clinics: number
+    doctors: number
+    appointments: number
+    averageRating: number
+}
 
 export default function HomePage() {
+    const [stats, setStats] = useState<Stats>({
+        clinics: 10,
+        doctors: 50,
+        appointments: 5000,
+        averageRating: 4.8
+    })
+
+    useEffect(() => {
+        api.get<Stats>('/public/stats')
+            .then(data => {
+                if (data) setStats(data);
+            })
+            .catch(err => console.error("Failed to load public stats", err));
+    }, [])
     return (
         <div className="min-h-screen">
             {/* Hero Section */}
@@ -80,10 +105,10 @@ export default function HomePage() {
             <section className="py-16 gradient-primary">
                 <div className="container mx-auto px-6">
                     <div className="grid md:grid-cols-4 gap-8 text-white text-center">
-                        <StatCard number="10+" label="Partner Clinics" />
-                        <StatCard number="50+" label="Specialist Doctors" />
-                        <StatCard number="5000+" label="Appointments Booked" />
-                        <StatCard number="4.8" label="Average Rating" icon={<Star className="w-5 h-5 inline" />} />
+                        <StatCard number={`${stats.clinics}+`} label="Partner Clinics" />
+                        <StatCard number={`${stats.doctors}+`} label="Specialist Doctors" />
+                        <StatCard number={`${stats.appointments}+`} label="Appointments Booked" />
+                        <StatCard number={`${stats.averageRating}`} label="Average Rating" icon={<Star className="w-5 h-5 inline" />} />
                     </div>
                 </div>
             </section>

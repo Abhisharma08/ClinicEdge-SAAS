@@ -31,7 +31,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
         let code = 'INTERNAL_ERROR';
-        let message = 'An unexpected error occurred';
+        let message = 'An unexpected system error occurred. Please try again or contact support.';
         let details = null;
 
         // Handle NestJS HTTP exceptions
@@ -112,37 +112,36 @@ export class HttpExceptionFilter implements ExceptionFilter {
         switch (error.code) {
             case 'P2002':
                 // Unique constraint violation
-                const field = (error.meta?.target as string[])?.join(', ') || 'field';
                 return {
                     code: 'DUPLICATE_ENTRY',
-                    message: `A record with this ${field} already exists`,
+                    message: `This information already exists in the system. Please try a different value.`,
                 };
 
             case 'P2025':
                 // Record not found
                 return {
                     code: 'NOT_FOUND',
-                    message: 'The requested record was not found',
+                    message: 'We could not find the requested information.',
                 };
 
             case 'P2003':
                 // Foreign key constraint
                 return {
                     code: 'INVALID_REFERENCE',
-                    message: 'Referenced record does not exist',
+                    message: 'This action cannot be completed because it relies on missing information.',
                 };
 
             case 'P2014':
                 // Required relation violation
                 return {
                     code: 'REQUIRED_RELATION',
-                    message: 'Required relation is missing',
+                    message: 'Please ensure all required fields and connections are provided.',
                 };
 
             default:
                 return {
                     code: 'DATABASE_ERROR',
-                    message: 'A database error occurred',
+                    message: 'An unexpected system error occurred. Please try again or contact support.',
                 };
         }
     }

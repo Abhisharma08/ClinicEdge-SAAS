@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { api } from '@/lib/api'
 import { Users, Shield, ShieldCheck, ShieldAlert, Search, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react'
 
@@ -90,9 +91,18 @@ export default function AdminUsersPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Global Users</h1>
-                <p className="text-gray-500">Manage all platform users across clinics</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Global Users</h1>
+                    <p className="text-gray-500">Manage all platform users across clinics</p>
+                </div>
+                <Link
+                    href="/admin/users/new"
+                    className="btn-primary flex items-center space-x-2"
+                >
+                    <Users className="w-5 h-5" />
+                    <span>Add User</span>
+                </Link>
             </div>
 
             {/* Filters */}

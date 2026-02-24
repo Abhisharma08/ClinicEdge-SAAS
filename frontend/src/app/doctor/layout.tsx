@@ -62,13 +62,15 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
                     <button onClick={() => setSidebarOpen(true)} className="lg:hidden"><Menu /></button>
 
                     <div className="flex items-center space-x-4 ml-auto">
-                        <div className="relative">
+                        <Link href="/doctor/notifications" className="relative cursor-pointer hover:opacity-80 transition-opacity">
                             <Bell className="w-6 h-6 text-gray-600" />
                             {unreadCount > 0 && (
                                 <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
                             )}
-                        </div>
-                        <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white">D</div>
+                        </Link>
+                        <Link href="/doctor/profile" className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white cursor-pointer hover:ring-2 hover:ring-gray-300 transition-all">
+                            D
+                        </Link>
                     </div>
                 </header>
                 <main className="flex-1 p-6">{children}</main>

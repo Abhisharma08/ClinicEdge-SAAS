@@ -48,7 +48,22 @@ class ApiClient {
         if (!res.ok) {
             const error = await res.json().catch(() => ({ message: 'Request failed' }))
             console.error('API Error:', error) // Log full error details for debugging
-            throw new Error(Array.isArray(error.message) ? error.message.join(', ') : error.message)
+
+            // Extract raw ValidationPipe errors
+            if (error.error?.code === 'VALIDATION_ERROR' && Array.isArray(error.error.details)) {
+                // Collect inner constraints strings (e.g. {"isEmail": "email must be an email"})
+                const validationMessages = error.error.details.flatMap((detail: any) => {
+                    return detail.constraints ? Object.values(detail.constraints) : []
+                });
+
+                if (validationMessages.length > 0) {
+                    throw new Error(validationMessages.join(' \n '));
+                }
+            }
+
+            // Standard error string
+            const errorMsg = error.error?.message || error.message;
+            throw new Error(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg)
         }
 
         return res.json()

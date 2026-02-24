@@ -1,14 +1,19 @@
-import { Controller, Post, Body, Headers, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Headers, HttpCode, HttpStatus, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { InteraktService } from './interakt.service';
 import { Public } from '../../../common/decorators';
+import * as crypto from 'crypto';
 
 @ApiTags('webhooks')
 @Controller('webhooks/interakt')
 export class InteraktWebhookController {
     private readonly logger = new Logger(InteraktWebhookController.name);
 
-    constructor(private readonly interaktService: InteraktService) { }
+    constructor(
+        private readonly interaktService: InteraktService,
+        private readonly configService: ConfigService,
+    ) { }
 
     @Post('delivery-status')
     @Public()
@@ -18,10 +23,29 @@ export class InteraktWebhookController {
         @Body() body: any,
         @Headers('x-interakt-signature') signature: string,
     ) {
-        this.logger.log(`Received Interakt webhook: ${JSON.stringify(body)}`);
+        if (!signature) {
+            this.logger.warn('Webhook received without signature');
+            throw new UnauthorizedException('Missing signature');
+        }
 
-        // TODO: Verify webhook signature in production
-        // For now, just process the webhook
+        const webhookSecret = this.configService.get<string>('interakt.webhookSecret');
+        if (webhookSecret) {
+            const hmac = crypto.createHmac('sha256', webhookSecret);
+            // Must use raw body for accurate HMAC in production, 
+            // but for JSON body, stringify can work if keys match exactly.
+            const calculatedSignature = hmac.update(JSON.stringify(body)).digest('hex');
+
+            if (calculatedSignature !== signature) {
+                this.logger.warn(`Invalid signature. Expected: ${calculatedSignature}, Received: ${signature}`);
+                throw new UnauthorizedException('Invalid signature');
+            }
+        } else {
+            this.logger.warn('INTERAKT_WEBHOOK_SECRET is not configured. Webhook validation skipped.');
+        }
+
+        this.logger.log(`Received secure Interakt webhook: ${body.message_id || 'unknown'}`);
+
+        // Process the webhook
         try {
             await this.interaktService.handleDeliveryStatus(body);
             return { success: true };

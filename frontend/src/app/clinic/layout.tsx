@@ -151,18 +151,18 @@ export default function ClinicDashboardLayout({
 
                     <div className="flex items-center space-x-4 ml-auto">
                         {/* Notification Bell in Header */}
-                        <div className="relative">
+                        <Link href="/clinic/notifications" className="relative cursor-pointer hover:opacity-80 transition-opacity">
                             <Bell className="w-6 h-6 text-gray-500" />
                             {unreadCount > 0 && (
                                 <span className="absolute top-0 right-0 transform translate-x-1/4 -translate-y-1/4 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
                             )}
-                        </div>
+                        </Link>
 
-                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                        <Link href="/clinic/settings" className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-primary-300 transition-all">
                             <span className="text-primary-600 text-sm font-medium">
                                 {user?.email?.[0]?.toUpperCase() || 'U'}
                             </span>
-                        </div>
+                        </Link>
                     </div>
                 </header>
 

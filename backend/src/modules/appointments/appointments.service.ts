@@ -285,11 +285,13 @@ export class AppointmentsService {
             },
         });
 
-        // Trigger appropriate notifications based on status change
+        // Trigger appropriate notifications based on status change asynchronously (fire-and-forget)
         if (status === AppointmentStatus.CONFIRMED) {
-            await this.notificationsService.sendAppointmentConfirmed(updated);
+            this.notificationsService.sendAppointmentConfirmed(updated)
+                .catch(err => this.logger.error(`Failed to send confirmation notification for ${updated.id}: ${err.message}`));
         } else if (status === AppointmentStatus.COMPLETED) {
-            await this.notificationsService.sendFeedbackRequest(updated);
+            this.notificationsService.sendFeedbackRequest(updated)
+                .catch(err => this.logger.error(`Failed to send feedback request for ${updated.id}: ${err.message}`));
         } else if (status === AppointmentStatus.COMPLETED_OFFLINE) {
             // Create a Visit Record for offline completion so it appears in history
             try {
@@ -308,7 +310,9 @@ export class AppointmentsService {
                     this.logger.warn(`Failed to create offline visit record for ${id}`, error);
                 }
             }
-            await this.notificationsService.sendFeedbackRequest(updated);
+
+            this.notificationsService.sendFeedbackRequest(updated)
+                .catch(err => this.logger.error(`Failed to send feedback request for ${updated.id}: ${err.message}`));
         }
 
         this.logger.log(`Appointment ${id} status updated to ${status}`);

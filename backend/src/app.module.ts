@@ -22,6 +22,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { HealthController } from './common/health.controller';
+import { PublicModule } from './modules/public/public.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -47,6 +48,7 @@ import configuration from './config/configuration';
         NotificationsModule,
         IntegrationsModule,
         CampaignsModule,
+        PublicModule,
     ],
     controllers: [HealthController],
     providers: [

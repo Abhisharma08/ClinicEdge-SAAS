@@ -122,8 +122,8 @@ export default function SuperAdminLayout({
                     </button>
 
                     <div className="ml-auto flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                        <Link href="/admin/settings" className="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity">
+                            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center hover:ring-2 hover:ring-primary-300 transition-all">
                                 <span className="text-primary-600 text-sm font-medium">
                                     {user?.email?.[0]?.toUpperCase() || 'A'}
                                 </span>
@@ -131,7 +131,7 @@ export default function SuperAdminLayout({
                             <span className="text-sm font-medium text-gray-700 hidden md:block">
                                 {user?.email}
                             </span>
-                        </div>
+                        </Link>
                     </div>
                 </header>
 
