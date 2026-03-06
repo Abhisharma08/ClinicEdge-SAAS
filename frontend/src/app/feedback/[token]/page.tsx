@@ -70,6 +70,7 @@ export default function FeedbackPage() {
     const [error, setError] = useState('')
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState<any>(null)
+    const [countdown, setCountdown] = useState(5)
 
     // Form State
     const [rating, setRating] = useState(0)
@@ -81,6 +82,17 @@ export default function FeedbackPage() {
     useEffect(() => {
         if (token) validateToken()
     }, [token])
+
+    // Auto-redirect to Google Reviews after countdown
+    useEffect(() => {
+        if (!submitted || !result?.redirectToGoogle || !result?.googleReviewUrl) return
+        if (countdown <= 0) {
+            window.open(result.googleReviewUrl, '_blank')
+            return
+        }
+        const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
+        return () => clearTimeout(timer)
+    }, [submitted, result, countdown])
 
     async function validateToken() {
         try {
@@ -209,8 +221,11 @@ export default function FeedbackPage() {
                                 background: '#F0FDF4', border: '1px solid #BBF7D0',
                                 borderRadius: '12px', padding: '20px', marginBottom: '16px',
                             }}>
-                                <p style={{ color: '#166534', fontSize: '14px', fontWeight: 600, margin: '0 0 12px' }}>
-                                    Would you like to share your experience on Google too?
+                                <p style={{ color: '#166534', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>
+                                    Redirecting to Google Reviews{countdown > 0 ? ` in ${countdown}s` : '...'}
+                                </p>
+                                <p style={{ color: '#15803D', fontSize: '12px', margin: '0 0 12px' }}>
+                                    Share your experience on Google too!
                                 </p>
                                 <a href={googleUrl} target="_blank" rel="noopener noreferrer"
                                     style={{

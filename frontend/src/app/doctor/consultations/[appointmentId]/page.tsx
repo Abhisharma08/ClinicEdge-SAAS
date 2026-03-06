@@ -148,9 +148,9 @@ export default function DoctorConsultationPage() {
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">New Consultation</h1>
                         <p className="text-sm text-gray-500">
-                            {appointment.patient.firstName && appointment.patient.lastName
+                            {appointment.patient?.firstName && appointment.patient?.lastName
                                 ? `${appointment.patient.firstName} ${appointment.patient.lastName}`
-                                : appointment.patient.name} • {appointment.patient.gender} • {appointment.patient.phone}
+                                : (appointment.patient?.name || 'Unknown Patient')} • {appointment.patient?.gender || '-'} • {appointment.patient?.phone || '-'}
                         </p>
                     </div>
                 </div>

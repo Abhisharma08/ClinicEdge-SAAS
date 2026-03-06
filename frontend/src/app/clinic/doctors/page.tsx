@@ -84,9 +84,9 @@ export default function DoctorsPage() {
             })
             setEditingId(null)
             if (user?.clinicId) fetchDoctors(user.clinicId)
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
-            alert('Failed to add doctor')
+            alert(error.message || 'Failed to save doctor')
         } finally {
             setSubmitting(false)
         }

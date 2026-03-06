@@ -177,12 +177,18 @@ export class NotificationsService {
             return;
         }
 
+        const appointmentDate = new Date(appointment.appointmentDate);
+        const startTime = new Date(appointment.startTime);
+
         const payload = {
             patientPhone: appointment.patient?.phone,
             patientName: appointment.patient?.name,
             patientEmail: appointment.patient?.email,
             doctorName: appointment.doctor?.name,
             clinicName: appointment.clinic?.name,
+            clinicAddress: appointment.clinic?.address,
+            date: appointmentDate.toISOString().split('T')[0],
+            time: `${startTime.getHours().toString().padStart(2, '0')}:${startTime.getMinutes().toString().padStart(2, '0')}`,
         };
 
         if (appointment.patient?.whatsappConsent) {

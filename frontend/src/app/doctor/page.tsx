@@ -103,9 +103,18 @@ export default function DoctorDashboardPage() {
                                             {(() => {
                                                 try {
                                                     const d = new Date(apt.appointmentDate);
-                                                    const t = new Date(apt.startTime);
-                                                    if (isNaN(d.getTime()) || isNaN(t.getTime())) return 'Invalid Date';
-                                                    return `${d.toLocaleDateString()} ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                                    if (isNaN(d.getTime())) return 'Invalid Date';
+                                                    const dateStr = d.toLocaleDateString();
+                                                    // Extract time directly from ISO string to avoid timezone conversion
+                                                    const timeMatch = (apt.startTime || '').match(/T(\d{2}):(\d{2})/);
+                                                    if (timeMatch) {
+                                                        const hours = parseInt(timeMatch[1], 10);
+                                                        const minutes = timeMatch[2];
+                                                        const ampm = hours >= 12 ? 'PM' : 'AM';
+                                                        const displayHour = hours % 12 || 12;
+                                                        return `${dateStr} ${displayHour}:${minutes} ${ampm}`;
+                                                    }
+                                                    return dateStr;
                                                 } catch (e) { return 'Date Error' }
                                             })()}
                                         </div>
@@ -152,6 +161,7 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
     const [slots, setSlots] = useState<any[]>([])
     const [loadingSlots, setLoadingSlots] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    const [patientSearch, setPatientSearch] = useState('')
     const [formData, setFormData] = useState({
         patientId: '',
         appointmentDate: new Date().toISOString().split('T')[0],
@@ -162,6 +172,7 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
     useEffect(() => {
         if (isOpen) {
             fetchInitialData()
+            setPatientSearch('')
         }
     }, [isOpen])
 
@@ -173,7 +184,7 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
 
     async function fetchInitialData() {
         try {
-            const res = await api.get<any>('/patients?limit=100')
+            const res = await api.get<any>('/patients?limit=200')
             setPatients(res.items || [])
         } catch (error) { console.error(error) }
     }
@@ -226,7 +237,7 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
             onSuccess()
         } catch (error: any) {
             console.error(error)
-            alert(error.response?.data?.message || 'Failed to book appointment')
+            alert(error.message || 'Failed to book appointment')
         } finally {
             setSubmitting(false)
         }
@@ -240,6 +251,12 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     }
 
+    const filteredPatients = patients.filter(p => {
+        if (!patientSearch) return true
+        const name = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+        return name.toLowerCase().includes(patientSearch.toLowerCase()) || (p.phone || '').includes(patientSearch)
+    })
+
     if (!isOpen) return null
 
     return (
@@ -252,6 +269,13 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium mb-1">Patient</label>
+                        <input
+                            type="text"
+                            placeholder="Search patients by name or phone..."
+                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 mb-2"
+                            value={patientSearch}
+                            onChange={e => setPatientSearch(e.target.value)}
+                        />
                         <select
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
                             value={formData.patientId}
@@ -259,8 +283,8 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                             required
                         >
                             <option value="">Select Patient</option>
-                            {patients.map(p => (
-                                <option key={p.id} value={p.id}>{p.name} ({p.phone})</option>
+                            {filteredPatients.map(p => (
+                                <option key={p.id} value={p.id}>{(p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})</option>
                             ))}
                         </select>
                     </div>
@@ -322,8 +346,8 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }
 

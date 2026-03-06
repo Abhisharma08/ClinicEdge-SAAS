@@ -187,18 +187,26 @@ export default function AppointmentsPage() {
     // Displays "10:30 AM"
     function formatDisplayTime(isoString: string) {
         try {
-            const date = new Date(isoString)
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            const match = isoString.match(/T(\d{2}):(\d{2})/)
+            if (match) {
+                const hours = parseInt(match[1], 10)
+                const minutes = match[2]
+                const ampm = hours >= 12 ? 'PM' : 'AM'
+                const displayHour = hours % 12 || 12
+                return `${displayHour}:${minutes} ${ampm}`
+            }
+            return isoString
         } catch (e) { return isoString }
     }
 
     // Extracts "10:30" for input[type="time"]
     function getIsoTime(isoString: string) {
         try {
-            const date = new Date(isoString)
-            const hours = String(date.getHours()).padStart(2, '0')
-            const minutes = String(date.getMinutes()).padStart(2, '0')
-            return `${hours}:${minutes}`
+            const match = isoString.match(/T(\d{2}):(\d{2})/)
+            if (match) {
+                return `${match[1]}:${match[2]}`
+            }
+            return ''
         } catch (e) { return '' }
     }
 
@@ -409,10 +417,10 @@ export default function AppointmentsPage() {
                                         disabled={!slot.available}
                                         onClick={() => setFormData({ ...formData, startTime: slot.start, endTime: slot.end })}
                                         className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${formData.startTime === slot.start
-                                                ? 'bg-primary-600 text-white border-primary-600'
-                                                : slot.available
-                                                    ? 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
-                                                    : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
+                                            ? 'bg-primary-600 text-white border-primary-600'
+                                            : slot.available
+                                                ? 'bg-white text-gray-700 border-gray-200 hover:border-primary-400'
+                                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
                                             }`}
                                     >
                                         {slot.start}

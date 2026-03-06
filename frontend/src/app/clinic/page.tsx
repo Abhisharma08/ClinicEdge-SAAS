@@ -68,8 +68,15 @@ export default function ClinicDashboardPage() {
     // Helper to format 1970-01-01Ttime string to just time
     function formatTime(isoString: string) {
         try {
-            const date = new Date(isoString)
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            const match = isoString.match(/T(\d{2}):(\d{2})/)
+            if (match) {
+                const hours = parseInt(match[1], 10)
+                const minutes = match[2]
+                const ampm = hours >= 12 ? 'PM' : 'AM'
+                const displayHour = hours % 12 || 12
+                return `${displayHour}:${minutes} ${ampm}`
+            }
+            return isoString
         } catch (e) {
             return isoString
         }
