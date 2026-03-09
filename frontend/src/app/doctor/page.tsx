@@ -253,8 +253,11 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
 
     const filteredPatients = patients.filter(p => {
         if (!patientSearch) return true
-        const name = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
-        return name.toLowerCase().includes(patientSearch.toLowerCase()) || (p.phone || '').includes(patientSearch)
+        const search = patientSearch.toLowerCase()
+        const fullName = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+        return fullName.toLowerCase().includes(search)
+            || (p.phone || '').includes(patientSearch)
+            || (p.email || '').toLowerCase().includes(search)
     })
 
     if (!isOpen) return null
@@ -271,16 +274,20 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                         <label className="block text-sm font-medium mb-1">Patient</label>
                         <input
                             type="text"
-                            placeholder="Search patients by name or phone..."
+                            placeholder="Search by name, phone or email..."
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 mb-2"
                             value={patientSearch}
                             onChange={e => setPatientSearch(e.target.value)}
                         />
+                        {patientSearch && (
+                            <p className="text-xs text-gray-500 mb-1">{filteredPatients.length} patient{filteredPatients.length !== 1 ? 's' : ''} found</p>
+                        )}
                         <select
                             className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
                             value={formData.patientId}
                             onChange={e => setFormData({ ...formData, patientId: e.target.value })}
                             required
+                            size={patientSearch ? Math.min(Math.max(filteredPatients.length + 1, 2), 6) : 1}
                         >
                             <option value="">Select Patient</option>
                             {filteredPatients.map(p => (

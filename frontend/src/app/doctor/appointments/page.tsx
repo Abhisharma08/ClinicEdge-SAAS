@@ -184,25 +184,36 @@ export default function DoctorAppointmentsPage() {
 
     function formatDisplayTime(isoString: string) {
         try {
-            const date = new Date(isoString)
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            const match = isoString.match(/T(\d{2}):(\d{2})/)
+            if (match) {
+                const hours = parseInt(match[1], 10)
+                const minutes = match[2]
+                const ampm = hours >= 12 ? 'PM' : 'AM'
+                const displayHour = hours % 12 || 12
+                return `${displayHour}:${minutes} ${ampm}`
+            }
+            return isoString
         } catch (e) { return isoString }
     }
 
     function getIsoTime(isoString: string) {
         try {
-            const date = new Date(isoString)
-            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+            const match = isoString.match(/T(\d{2}):(\d{2})/)
+            if (match) {
+                return `${match[1]}:${match[2]}`
+            }
+            return ''
         } catch (e) { return '' }
     }
 
-    const filteredPatients = patientSearch
-        ? patients.filter(p => {
-            const name = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
-            return name.toLowerCase().includes(patientSearch.toLowerCase()) ||
-                (p.phone || '').includes(patientSearch)
-        })
-        : patients
+    const filteredPatients = patients.filter(p => {
+        if (!patientSearch) return true
+        const search = patientSearch.toLowerCase()
+        const fullName = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+        return fullName.toLowerCase().includes(search)
+            || (p.phone || '').includes(patientSearch)
+            || (p.email || '').toLowerCase().includes(search)
+    })
 
     return (
         <div className="space-y-6">
@@ -384,17 +395,21 @@ export default function DoctorAppointmentsPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search patients..."
+                                placeholder="Search by name, phone or email..."
                                 className="input w-full pl-9"
                                 value={patientSearch}
                                 onChange={e => setPatientSearch(e.target.value)}
                             />
                         </div>
+                        {patientSearch && (
+                            <p className="text-xs text-gray-500 mb-1">{filteredPatients.length} patient{filteredPatients.length !== 1 ? 's' : ''} found</p>
+                        )}
                         <select
                             className="input w-full"
                             value={formData.patientId}
                             onChange={e => setFormData({ ...formData, patientId: e.target.value })}
                             required
+                            size={patientSearch ? Math.min(Math.max(filteredPatients.length + 1, 2), 6) : 1}
                         >
                             <option value="">Select Patient</option>
                             {filteredPatients.map(p => (

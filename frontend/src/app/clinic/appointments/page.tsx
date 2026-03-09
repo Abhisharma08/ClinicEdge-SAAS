@@ -361,27 +361,43 @@ export default function AppointmentsPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search patients..."
+                                    placeholder="Search by name, phone or email..."
                                     className="input w-full pl-9"
                                     value={patientSearch}
                                     onChange={e => setPatientSearch(e.target.value)}
                                 />
                             </div>
-                            <select
-                                className="input w-full"
-                                value={formData.patientId}
-                                onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-                                required
-                            >
-                                <option value="">Select Patient</option>
-                                {patients
-                                    .filter(p => {
-                                        if (!patientSearch) return true
-                                        const name = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
-                                        return name.toLowerCase().includes(patientSearch.toLowerCase()) || (p.phone || '').includes(patientSearch)
-                                    })
-                                    .map(p => <option key={p.id} value={p.id}>{p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})</option>)}
-                            </select>
+                            {(() => {
+                                const filtered = patients.filter(p => {
+                                    if (!patientSearch) return true
+                                    const search = patientSearch.toLowerCase()
+                                    const fullName = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+                                    return fullName.toLowerCase().includes(search)
+                                        || (p.phone || '').includes(patientSearch)
+                                        || (p.email || '').toLowerCase().includes(search)
+                                })
+                                return (
+                                    <>
+                                        {patientSearch && (
+                                            <p className="text-xs text-gray-500 mb-1">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</p>
+                                        )}
+                                        <select
+                                            className="input w-full"
+                                            value={formData.patientId}
+                                            onChange={e => setFormData({ ...formData, patientId: e.target.value })}
+                                            required
+                                            size={patientSearch ? Math.min(Math.max(filtered.length + 1, 2), 6) : 1}
+                                        >
+                                            <option value="">Select Patient</option>
+                                            {filtered.map(p => (
+                                                <option key={p.id} value={p.id}>
+                                                    {(p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </>
+                                )
+                            })()}
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1">Doctor</label>
