@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Building2, Clock, Save, Settings, AlertCircle, Bell } from 'lucide-react'
+import { Building2, Clock, Save, Settings, AlertCircle, Bell, Link as LinkIcon, Mail, MessageSquare, Phone } from 'lucide-react'
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
@@ -12,6 +12,8 @@ export default function SettingsPage() {
     const [submitting, setSubmitting] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [clinic, setClinic] = useState<any>(null)
+    const [integrationSubmitting, setIntegrationSubmitting] = useState(false)
+    const [testingState, setTestingState] = useState<Record<string, boolean>>({})
 
     const [formData, setFormData] = useState({
         name: '',
@@ -28,6 +30,12 @@ export default function SettingsPage() {
         operatingHours: {} as Record<string, { start: string; end: string; isOpen: boolean }>
     })
 
+    const [integrationData, setIntegrationData] = useState({
+        smtp: { host: '', port: 587, user: '', pass: '', from: '' },
+        interakt: { apiKey: '', baseUrl: 'https://api.interakt.ai/v1' },
+        twilio: { accountSid: '', authToken: '', fromNumber: '' }
+    })
+
     useEffect(() => {
         const userData = localStorage.getItem('user')
         if (userData) {
@@ -42,8 +50,16 @@ export default function SettingsPage() {
     async function fetchClinic(clinicId: string) {
         setLoading(true)
         try {
-            const res = await api.get<any>(`/clinics/${clinicId}`)
+            const [res, integrationRes] = await Promise.all([
+                api.get<any>(`/clinics/${clinicId}`),
+                api.get<any>(`/clinics/${clinicId}/integrations`).catch(() => ({}))
+            ])
             setClinic(res)
+            setIntegrationData({
+                smtp: integrationRes?.smtp || { host: '', port: 587, user: '', pass: '', from: '' },
+                interakt: integrationRes?.interakt || { apiKey: '', baseUrl: 'https://api.interakt.ai/v1' },
+                twilio: integrationRes?.twilio || { accountSid: '', authToken: '', fromNumber: '' }
+            })
             setFormData({
                 name: res.name,
                 phone: res.phone || '',
@@ -92,6 +108,37 @@ export default function SettingsPage() {
         }
     }
 
+    async function handleSaveIntegrations() {
+        setIntegrationSubmitting(true)
+        try {
+            await api.put(`/clinics/${user.clinicId}/integrations`, integrationData)
+            alert('Integrations updated successfully')
+            await fetchClinic(user.clinicId) // Refresh to display masked secrets
+        } catch (error: any) {
+            console.error(error)
+            const msg = error.response?.data?.message || 'Failed to update integrations'
+            alert(msg)
+        } finally {
+            setIntegrationSubmitting(false)
+        }
+    }
+
+    async function handleTestIntegration(channel: string) {
+        setTestingState({ ...testingState, [channel]: true })
+        try {
+            // Ensure unsaved changes are saved first
+            await api.put(`/clinics/${user.clinicId}/integrations`, integrationData)
+            const result = await api.post<any>(`/clinics/${user.clinicId}/integrations/test`, { channel })
+            alert(result.message || 'Test complete')
+        } catch (error: any) {
+            console.error(error)
+            const msg = error.response?.data?.message || `Failed to test ${channel}`
+            alert(msg)
+        } finally {
+            setTestingState({ ...testingState, [channel]: false })
+        }
+    }
+
     if (loading) return <div className="p-8 text-center">Loading settings...</div>
 
     return (
@@ -136,6 +183,18 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                         <Bell size={16} />
                         <span>Notifications</span>
+                    </div>
+                </button>
+                <button
+                    onClick={() => setActiveTab('integrations')}
+                    className={`pb-3 px-1 text-sm font-medium transition-colors relative ${activeTab === 'integrations'
+                        ? 'text-black border-b-2 border-black'
+                        : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                >
+                    <div className="flex items-center gap-2">
+                        <LinkIcon size={16} />
+                        <span>Integrations</span>
                     </div>
                 </button>
             </div>
@@ -361,17 +420,194 @@ export default function SettingsPage() {
                     </div>
                 )}
 
-                <div className="flex justify-end pt-4">
-                    <button
-                        type="submit"
-                        disabled={submitting}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
-                    >
-                        <Save size={20} />
-                        <span>{submitting ? 'Saving Changes...' : 'Save Changes'}</span>
-                    </button>
-                </div>
+                {activeTab !== 'integrations' && (
+                    <div className="flex justify-end pt-4">
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
+                        >
+                            <Save size={20} />
+                            <span>{submitting ? 'Saving Changes...' : 'Save Changes'}</span>
+                        </button>
+                    </div>
+                )}
             </form>
+
+            {activeTab === 'integrations' && (
+                <div className="space-y-6 pb-12">
+                    {/* SMTP Configuration */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <Mail size={20} className="text-gray-500" /> SMTP (Email)
+                            </h3>
+                            <button
+                                type="button"
+                                disabled={testingState['EMAIL']}
+                                onClick={() => handleTestIntegration('EMAIL')}
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {testingState['EMAIL'] ? 'Testing...' : 'Test Connection'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Host</label>
+                                <input
+                                    type="text"
+                                    value={integrationData.smtp.host || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, smtp: { ...integrationData.smtp, host: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="smtp.gmail.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Port</label>
+                                <input
+                                    type="number"
+                                    value={integrationData.smtp.port || 587}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, smtp: { ...integrationData.smtp, port: Number(e.target.value) } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="587"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Username (Email)</label>
+                                <input
+                                    type="text"
+                                    value={integrationData.smtp.user || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, smtp: { ...integrationData.smtp, user: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="clinic@example.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Password / App Password</label>
+                                <input
+                                    type="password"
+                                    value={integrationData.smtp.pass || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, smtp: { ...integrationData.smtp, pass: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder={integrationData.smtp.pass === '****' ? '••••••••' : "App Password"}
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">From Email Format</label>
+                                <input
+                                    type="text"
+                                    value={integrationData.smtp.from || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, smtp: { ...integrationData.smtp, from: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder={'"My Clinic Name" <clinic@example.com>'}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Leave blank to inherit from generic settings if empty.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Twilio Configuration */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <Phone size={20} className="text-gray-500" /> Twilio (SMS)
+                            </h3>
+                            <button
+                                type="button"
+                                disabled={testingState['SMS']}
+                                onClick={() => handleTestIntegration('SMS')}
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {testingState['SMS'] ? 'Testing...' : 'Test Connection'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Account SID</label>
+                                <input
+                                    type="text"
+                                    value={integrationData.twilio.accountSid || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, twilio: { ...integrationData.twilio, accountSid: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Auth Token</label>
+                                <input
+                                    type="password"
+                                    value={integrationData.twilio.authToken || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, twilio: { ...integrationData.twilio, authToken: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder={integrationData.twilio.authToken === '****' ? '••••••••' : "Auth Token"}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">From Phone Number</label>
+                                <input
+                                    type="text"
+                                    value={integrationData.twilio.fromNumber || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, twilio: { ...integrationData.twilio, fromNumber: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="+1234567890"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Include country code.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Interakt Configuration */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                                <MessageSquare size={20} className="text-gray-500" /> Interakt (WhatsApp)
+                            </h3>
+                            <button
+                                type="button"
+                                disabled={testingState['WHATSAPP']}
+                                onClick={() => handleTestIntegration('WHATSAPP')}
+                                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {testingState['WHATSAPP'] ? 'Testing...' : 'Test Connection'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Interakt API Key (Base64)</label>
+                                <input
+                                    type="password"
+                                    value={integrationData.interakt.apiKey || ''}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, interakt: { ...integrationData.interakt, apiKey: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm font-mono"
+                                    placeholder={integrationData.interakt.apiKey === '****' ? '••••••••' : "Api Key"}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+                                <input
+                                    type="url"
+                                    value={integrationData.interakt.baseUrl || 'https://api.interakt.ai/v1'}
+                                    onChange={(e) => setIntegrationData({ ...integrationData, interakt: { ...integrationData.interakt, baseUrl: e.target.value } })}
+                                    className="w-full rounded-lg border-gray-300 focus:ring-black focus:border-black text-sm"
+                                    placeholder="https://api.interakt.ai/v1"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                        <button
+                            type="button"
+                            onClick={handleSaveIntegrations}
+                            disabled={integrationSubmitting}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50"
+                        >
+                            <Save size={20} />
+                            <span>{integrationSubmitting ? 'Saving Integrations...' : 'Save Integrations'}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

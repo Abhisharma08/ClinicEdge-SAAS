@@ -8,6 +8,11 @@ interface InteraktResponse {
     status: string;
 }
 
+export interface InteraktConfig {
+    apiKey: string;
+    baseUrl?: string;
+}
+
 @Injectable()
 export class InteraktService {
     private readonly logger = new Logger(InteraktService.name);
@@ -30,6 +35,7 @@ export class InteraktService {
         phoneNumber: string,
         templateName: string,
         params: string[],
+        config?: InteraktConfig,
     ): Promise<InteraktResponse> {
         // Normalize phone number (remove + and spaces)
         const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
@@ -45,7 +51,10 @@ export class InteraktService {
             },
         };
 
-        return this.sendWithRetry(payload);
+        const effectiveApiKey = config?.apiKey || this.apiKey;
+        const effectiveBaseUrl = config?.baseUrl || this.baseUrl;
+
+        return this.sendWithRetry(payload, 1, effectiveApiKey, effectiveBaseUrl);
     }
 
     /**
@@ -54,13 +63,15 @@ export class InteraktService {
     private async sendWithRetry(
         payload: any,
         attempt: number = 1,
+        apiKey: string = this.apiKey,
+        baseUrl: string = this.baseUrl,
     ): Promise<InteraktResponse> {
         try {
-            const response = await fetch(`${this.baseUrl}/public/message/`, {
+            const response = await fetch(`${baseUrl}/public/message/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Basic ${this.apiKey}`,
+                    Authorization: `Basic ${apiKey}`,
                 },
                 body: JSON.stringify(payload),
             });
@@ -84,7 +95,7 @@ export class InteraktService {
             if (attempt < this.maxRetries) {
                 // Exponential backoff
                 await this.delay(Math.pow(2, attempt) * 1000);
-                return this.sendWithRetry(payload, attempt + 1);
+                return this.sendWithRetry(payload, attempt + 1, apiKey, baseUrl);
             }
 
             throw error;

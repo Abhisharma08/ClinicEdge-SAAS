@@ -73,11 +73,35 @@ export class ClinicsController {
     }
 
     @Patch(':id/settings')
-    @Roles(UserRole.CLINIC_ADMIN)
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.SUPER_ADMIN)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({ summary: 'Update clinic settings' })
     async updateSettings(@Param('id') id: string, @Body() settings: Record<string, any>) {
         return this.clinicsService.updateSettings(id, settings);
+    }
+
+    @Get(':id/integrations')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Get clinic integration credentials settings' })
+    async getIntegrations(@Param('id') id: string) {
+        return this.clinicsService.getIntegrationConfig(id);
+    }
+
+    @Put(':id/integrations')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Update clinic integration credentials settings' })
+    async updateIntegrations(@Param('id') id: string, @Body() config: any) {
+        return this.clinicsService.updateIntegrationConfig(id, config);
+    }
+
+    @Post(':id/integrations/test')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.SUPER_ADMIN)
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({ summary: 'Test clinic integration credentials (EMAIL, WHATSAPP, SMS)' })
+    async testIntegration(@Param('id') id: string, @Body('channel') channel: string) {
+        return this.clinicsService.testIntegrationConfig(id, channel);
     }
 
     @Put(':id')

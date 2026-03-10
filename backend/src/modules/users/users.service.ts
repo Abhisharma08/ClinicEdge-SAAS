@@ -159,9 +159,16 @@ export class UsersService {
     }
 
     async softDelete(id: string) {
+        const user = await this.findById(id);
+        const deletedEmail = `${user.email}__deleted__${Date.now()}`;
+
         return this.prisma.user.update({
             where: { id },
-            data: { deletedAt: new Date(), isActive: false },
+            data: {
+                email: deletedEmail,
+                deletedAt: new Date(),
+                isActive: false
+            },
         });
     }
 }

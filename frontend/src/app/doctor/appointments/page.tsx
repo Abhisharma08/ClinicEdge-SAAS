@@ -184,25 +184,17 @@ export default function DoctorAppointmentsPage() {
 
     function formatDisplayTime(isoString: string) {
         try {
-            const match = isoString.match(/T(\d{2}):(\d{2})/)
-            if (match) {
-                const hours = parseInt(match[1], 10)
-                const minutes = match[2]
-                const ampm = hours >= 12 ? 'PM' : 'AM'
-                const displayHour = hours % 12 || 12
-                return `${displayHour}:${minutes} ${ampm}`
-            }
-            return isoString
+            const date = new Date(isoString)
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         } catch (e) { return isoString }
     }
 
     function getIsoTime(isoString: string) {
         try {
-            const match = isoString.match(/T(\d{2}):(\d{2})/)
-            if (match) {
-                return `${match[1]}:${match[2]}`
-            }
-            return ''
+            const date = new Date(isoString)
+            const hours = String(date.getHours()).padStart(2, '0')
+            const minutes = String(date.getMinutes()).padStart(2, '0')
+            return `${hours}:${minutes}`
         } catch (e) { return '' }
     }
 

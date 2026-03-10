@@ -1,11 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaginationDto, createPaginatedResult } from '../../common/dto';
 import { CreateClinicDto, UpdateClinicDto } from './dto';
+import { EmailService } from '../integrations/email/email.service';
+import { InteraktService } from '../integrations/interakt/interakt.service';
+import { TwilioService } from '../integrations/twilio/twilio.service';
 
 @Injectable()
 export class ClinicsService {
-    constructor(private prisma: PrismaService) { }
+    private readonly logger = new Logger(ClinicsService.name);
+
+    constructor(
+        private prisma: PrismaService,
+        private emailService: EmailService,
+        private interaktService: InteraktService,
+        private twilioService: TwilioService,
+    ) { }
 
     async create(dto: CreateClinicDto) {
         return this.prisma.clinic.create({
@@ -239,5 +249,142 @@ export class ClinicsService {
             data: { settings: merged },
             select: { settings: true },
         });
+    }
+
+    async getIntegrationConfig(id: string) {
+        const clinic = await this.prisma.clinic.findUnique({
+            where: { id },
+            select: { settings: true },
+        });
+
+        if (!clinic) {
+            throw new NotFoundException('Clinic not found');
+        }
+
+        const settings = (clinic.settings as any) || {};
+        const integrations = settings.integrations || {};
+
+        // Mask secrets
+        return {
+            smtp: integrations.smtp ? { ...integrations.smtp, pass: '****' } : null,
+            interakt: integrations.interakt ? { ...integrations.interakt, apiKey: '****' } : null,
+            twilio: integrations.twilio ? { ...integrations.twilio, authToken: '****' } : null,
+        };
+    }
+
+    async updateIntegrationConfig(id: string, config: any) {
+        const clinic = await this.prisma.clinic.findUnique({
+            where: { id },
+            select: { settings: true },
+        });
+
+        if (!clinic) {
+            throw new NotFoundException('Clinic not found');
+        }
+
+        const settings: any = clinic.settings || {};
+        const pIntegrations = settings.integrations || {};
+
+        // Merge incoming config but ignore asterisks (keep existing secret)
+        const updatedSmtp = config.smtp ? {
+            ...pIntegrations.smtp,
+            ...config.smtp,
+            pass: config.smtp.pass === '****' ? pIntegrations.smtp?.pass : config.smtp.pass,
+        } : pIntegrations.smtp;
+
+        const updatedInterakt = config.interakt ? {
+            ...pIntegrations.interakt,
+            ...config.interakt,
+            apiKey: config.interakt.apiKey === '****' ? pIntegrations.interakt?.apiKey : config.interakt.apiKey,
+        } : pIntegrations.interakt;
+
+        const updatedTwilio = config.twilio ? {
+            ...pIntegrations.twilio,
+            ...config.twilio,
+            authToken: config.twilio.authToken === '****' ? pIntegrations.twilio?.authToken : config.twilio.authToken,
+        } : pIntegrations.twilio;
+
+        // Clean up empty objects
+        const newIntegrations: any = {};
+        if (updatedSmtp && Object.keys(updatedSmtp).length > 0) newIntegrations.smtp = updatedSmtp;
+        if (updatedInterakt && Object.keys(updatedInterakt).length > 0) newIntegrations.interakt = updatedInterakt;
+        if (updatedTwilio && Object.keys(updatedTwilio).length > 0) newIntegrations.twilio = updatedTwilio;
+
+        const updatedSettings = { ...settings, integrations: newIntegrations };
+
+        await this.prisma.clinic.update({
+            where: { id },
+            data: { settings: updatedSettings },
+        });
+
+        return this.getIntegrationConfig(id);
+    }
+
+    async testIntegrationConfig(id: string, channel: string) {
+        const clinic = await this.prisma.clinic.findUnique({
+            where: { id },
+            select: { settings: true, email: true, phone: true },
+        });
+
+        if (!clinic) throw new NotFoundException('Clinic not found');
+
+        const settings = (clinic.settings as any) || {};
+        const integrations = settings.integrations || {};
+
+        if (channel === 'EMAIL') {
+            if (!integrations.smtp?.host) throw new BadRequestException('SMTP not configured');
+            if (!clinic.email) throw new BadRequestException('Clinic has no primary email address to test with');
+
+            try {
+                await this.emailService.sendEmail(
+                    clinic.email,
+                    'Test Configuration - ClinicEdge',
+                    '<p>Your SMTP integration is working correctly!</p>',
+                    integrations.smtp
+                );
+                return { success: true, message: `Test email sent to ${clinic.email}` };
+            } catch (error) {
+                this.logger.error(`SMTP test failed for clinic ${id}: ` + error.message);
+                throw new BadRequestException(`SMTP test failed: ${error.message}`);
+            }
+        } else if (channel === 'WHATSAPP') {
+            if (!integrations.interakt?.apiKey) throw new BadRequestException('Interakt not configured');
+            if (!clinic.phone) throw new BadRequestException('Clinic has no primary phone address to test with');
+
+            try {
+                // Testing with the generic ping template or a basic message
+                // In production, you would need a pre-approved template for testing
+                // Let's assume we have a test template or attempt to call the raw API to verify credentials
+                const response = await fetch(`${integrations.interakt.baseUrl || 'https://api.interakt.ai/v1'}/public/account/details`, {
+                    headers: { 'Authorization': `Basic ${integrations.interakt.apiKey}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Interakt API rejected credentials: ${response.status}`);
+                }
+
+                return { success: true, message: 'Interakt credentials verified successfully' };
+            } catch (error) {
+                this.logger.error(`Interakt test failed for clinic ${id}: ` + error.message);
+                throw new BadRequestException(`Interakt test failed: ${error.message}`);
+            }
+        } else if (channel === 'SMS') {
+            if (!integrations.twilio?.accountSid) throw new BadRequestException('Twilio not configured');
+            if (!clinic.phone) throw new BadRequestException('Clinic has no primary phone address to test with');
+
+            try {
+                await this.twilioService.sendSms(
+                    clinic.phone,
+                    'Test Configuration working correctly! - ClinicEdge',
+                    integrations.twilio
+                );
+                return { success: true, message: `Test SMS sent to ${clinic.phone}` };
+            } catch (error) {
+                this.logger.error(`Twilio test failed for clinic ${id}: ` + error.message);
+                throw new BadRequestException(`Twilio test failed: ${error.message}`);
+            }
+        }
+
+        throw new BadRequestException('Unsupported channel type');
     }
 }

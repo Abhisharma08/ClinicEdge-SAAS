@@ -118,7 +118,8 @@ function DoctorPatientsPageContent() {
             if (!formData.firstName.trim()) errs.firstName = 'Required'
             if (!formData.lastName.trim()) errs.lastName = 'Required'
             if (!formData.phone.trim()) errs.phone = 'Required'
-            else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone.trim())) errs.phone = 'Invalid phone format'
+            else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phone.trim())) errs.phone = 'Invalid phone format (e.g., +919876543210)'
+            if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) errs.email = 'Invalid email format'
             if (!formData.dob) errs.dob = 'Required'
             if (!formData.gender) errs.gender = 'Required'
         }
@@ -132,6 +133,12 @@ function DoctorPatientsPageContent() {
             if (!formData.emergencyName.trim()) errs.emergencyName = 'Required'
             if (!formData.emergencyRelationship.trim()) errs.emergencyRelationship = 'Required'
             if (!formData.emergencyPhone.trim()) errs.emergencyPhone = 'Required'
+            else if (!/^\+?[1-9]\d{1,14}$/.test(formData.emergencyPhone.trim())) errs.emergencyPhone = 'Invalid phone format'
+        }
+        if (step === 3) {
+            if (formData.nomineePhone && !/^\+?[1-9]\d{1,14}$/.test(formData.nomineePhone.trim())) {
+                errs.nomineePhone = 'Invalid phone format'
+            }
         }
         if (step === 5 && !formData.dpdpConsent && !editingId) {
             errs.dpdpConsent = 'DPDP consent is required'
@@ -179,7 +186,11 @@ function DoctorPatientsPageContent() {
             setEditingId(null)
             setStep(0)
             fetchPatients()
-        } catch { alert('Failed to save patient') }
+        } catch (error: any) {
+            console.error('Save patient error:', error)
+            const apiMsg = error.response?.data?.message || error.message || 'Failed to save patient'
+            alert(Array.isArray(apiMsg) ? apiMsg.join('\n') : apiMsg)
+        }
         finally { setSubmitting(false) }
     }
 

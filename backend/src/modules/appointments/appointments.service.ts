@@ -118,13 +118,9 @@ export class AppointmentsService {
                     dto.appointmentDate,
                 );
 
-                // Schedule notifications (Non-blocking)
-                try {
-                    await this.notificationsService.scheduleAppointmentNotifications(appointment);
-                } catch (error) {
-                    this.logger.error(`Failed to schedule notifications for appointment ${appointment.id}`, error);
-                    // Don't fail the request if notifications fail
-                }
+                // Schedule notifications (fire-and-forget, don't block the response)
+                this.notificationsService.scheduleAppointmentNotifications(appointment)
+                    .catch(error => this.logger.error(`Failed to schedule notifications for appointment ${appointment.id}`, error));
 
                 this.logger.log(`Appointment created: ${appointment.id}`);
 

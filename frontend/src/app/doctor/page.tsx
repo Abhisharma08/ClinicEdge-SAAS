@@ -103,18 +103,9 @@ export default function DoctorDashboardPage() {
                                             {(() => {
                                                 try {
                                                     const d = new Date(apt.appointmentDate);
-                                                    if (isNaN(d.getTime())) return 'Invalid Date';
-                                                    const dateStr = d.toLocaleDateString();
-                                                    // Extract time directly from ISO string to avoid timezone conversion
-                                                    const timeMatch = (apt.startTime || '').match(/T(\d{2}):(\d{2})/);
-                                                    if (timeMatch) {
-                                                        const hours = parseInt(timeMatch[1], 10);
-                                                        const minutes = timeMatch[2];
-                                                        const ampm = hours >= 12 ? 'PM' : 'AM';
-                                                        const displayHour = hours % 12 || 12;
-                                                        return `${dateStr} ${displayHour}:${minutes} ${ampm}`;
-                                                    }
-                                                    return dateStr;
+                                                    const t = new Date(apt.startTime);
+                                                    if (isNaN(d.getTime()) || isNaN(t.getTime())) return 'Invalid Date';
+                                                    return `${d.toLocaleDateString()} ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                                 } catch (e) { return 'Date Error' }
                                             })()}
                                         </div>

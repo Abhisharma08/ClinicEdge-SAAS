@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { InteraktService } from '../integrations/interakt/interakt.service';
 import { EmailService } from '../integrations/email/email.service';
+import { TwilioService } from '../integrations/twilio/twilio.service';
 import { NotificationType, NotificationChannel, NotificationStatus } from '@prisma/client';
 import { generateSecureToken } from '../../common/utils/encryption.util';
 import {
@@ -18,6 +19,7 @@ import {
 @Injectable()
 export class NotificationsService {
     private readonly logger = new Logger(NotificationsService.name);
+    private integrationConfigCache: Map<string, { config: any; cachedAt: number }> = new Map();
 
     constructor(
         private prisma: PrismaService,
@@ -25,7 +27,31 @@ export class NotificationsService {
         @Inject(forwardRef(() => InteraktService))
         private interaktService: InteraktService,
         private emailService: EmailService,
+        private twilioService: TwilioService,
     ) { }
+
+    /**
+     * Get integration config for a clinic (cached for 5 minutes)
+     */
+    private async getClinicIntegrationConfig(clinicId: string): Promise<any> {
+        const cached = this.integrationConfigCache.get(clinicId);
+        if (cached && Date.now() - cached.cachedAt < 5 * 60 * 1000) {
+            return cached.config;
+        }
+
+        try {
+            const clinic = await this.prisma.clinic.findUnique({
+                where: { id: clinicId },
+                select: { settings: true },
+            });
+            const settings = (clinic?.settings as any) || {};
+            const config = settings.integrations || {};
+            this.integrationConfigCache.set(clinicId, { config, cachedAt: Date.now() });
+            return config;
+        } catch {
+            return {};
+        }
+    }
 
     /**
      * Check if clinic has notifications enabled (defaults to true)
@@ -145,6 +171,18 @@ export class NotificationsService {
                     type: NotificationType.APPOINTMENT_REMINDER_2H,
                     channel: NotificationChannel.WHATSAPP,
                     scheduledAt: reminder2h,
+                    payload: commonPayload,
+                });
+            }
+
+            // Send SMS notification to patient (via Twilio if configured)
+            if (appointment.patient?.phone) {
+                await this.createNotification({
+                    clinicId: appointment.clinicId,
+                    appointmentId: appointment.id,
+                    type: NotificationType.APPOINTMENT_CREATED,
+                    channel: NotificationChannel.SMS,
+                    scheduledAt: new Date(),
                     payload: commonPayload,
                 });
             }
@@ -317,6 +355,8 @@ export class NotificationsService {
                 await this.sendWhatsAppNotification(notification);
             } else if (notification.channel === NotificationChannel.EMAIL) {
                 await this.sendEmailNotification(notification);
+            } else if (notification.channel === NotificationChannel.SMS) {
+                await this.sendSmsNotification(notification);
             } else if (notification.channel === NotificationChannel.DASHBOARD) {
                 // Dashboard notifications are just marked as sent
                 await this.updateNotificationStatus(notification.id, NotificationStatus.SENT);
@@ -342,10 +382,15 @@ export class NotificationsService {
         }
 
         try {
+            // Get per-clinic Interakt config
+            const integrationConfig = await this.getClinicIntegrationConfig(notification.clinicId);
+            const interaktConfig = integrationConfig.interakt;
+
             const result = await this.interaktService.sendTemplateMessage(
                 payload.patientPhone,
                 this.getTemplateName(notification.type),
                 this.getTemplateParams(notification.type, payload),
+                interaktConfig,
             );
 
             await this.prisma.notification.update({
@@ -412,7 +457,11 @@ export class NotificationsService {
         const subject = this.getEmailSubject(notification.type, payload.recipientType);
         const html = this.getEmailHtml(notification.type, payload);
 
-        await this.emailService.sendEmail(recipientEmail, subject, html);
+        // Get per-clinic SMTP config
+        const integrationConfig = await this.getClinicIntegrationConfig(notification.clinicId);
+        const smtpConfig = integrationConfig.smtp;
+
+        await this.emailService.sendEmail(recipientEmail, subject, html, smtpConfig);
 
         await this.prisma.notification.update({
             where: { id: notification.id },
@@ -423,6 +472,65 @@ export class NotificationsService {
         });
 
         this.logger.log(`Email notification sent: ${notification.id}`);
+    }
+
+    /**
+     * Send SMS notification via Twilio
+     */
+    private async sendSmsNotification(notification: any) {
+        const payload = notification.payload;
+
+        if (!payload.patientPhone) {
+            throw new Error('Patient phone number is required for SMS');
+        }
+
+        // Get per-clinic Twilio config
+        const integrationConfig = await this.getClinicIntegrationConfig(notification.clinicId);
+        const twilioConfig = integrationConfig.twilio;
+
+        if (!twilioConfig?.accountSid || !twilioConfig?.authToken || !twilioConfig?.fromNumber) {
+            this.logger.log(`Twilio not configured for clinic ${notification.clinicId}, skipping SMS`);
+            await this.updateNotificationStatus(notification.id, NotificationStatus.FAILED, 'Twilio not configured');
+            return;
+        }
+
+        const smsBody = this.getSmsBody(notification.type, payload);
+
+        const result = await this.twilioService.sendSms(
+            payload.patientPhone,
+            smsBody,
+            twilioConfig,
+        );
+
+        await this.prisma.notification.update({
+            where: { id: notification.id },
+            data: {
+                status: NotificationStatus.SENT,
+                externalId: result.sid,
+                sentAt: new Date(),
+            },
+        });
+
+        this.logger.log(`SMS notification sent: ${notification.id}`);
+    }
+
+    /**
+     * Generate SMS body text based on notification type
+     */
+    private getSmsBody(type: NotificationType, payload: any): string {
+        const { patientName, doctorName, clinicName, date, time } = payload;
+        switch (type) {
+            case NotificationType.APPOINTMENT_CREATED:
+                return `Hi ${patientName}, your appointment with Dr. ${doctorName} at ${clinicName} is booked for ${date} at ${time}. Thank you!`;
+            case NotificationType.APPOINTMENT_CONFIRMED:
+                return `Hi ${patientName}, your appointment with Dr. ${doctorName} at ${clinicName} on ${date} at ${time} is confirmed.`;
+            case NotificationType.APPOINTMENT_REMINDER_24H:
+                return `Reminder: You have an appointment with Dr. ${doctorName} at ${clinicName} tomorrow at ${time}.`;
+            case NotificationType.APPOINTMENT_REMINDER_2H:
+                return `Reminder: Your appointment with Dr. ${doctorName} at ${clinicName} is in 2 hours at ${time}.`;
+            default:
+                return `Notification from ${clinicName}: Your appointment update.`;
+        }
     }
 
     private getEmailSubject(type: NotificationType, recipientType?: string): string {

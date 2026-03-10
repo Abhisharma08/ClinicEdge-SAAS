@@ -49,6 +49,7 @@ enum NotificationChannel {
   WHATSAPP
   DASHBOARD
   EMAIL
+  SMS
 }
 
 enum NotificationStatus {
