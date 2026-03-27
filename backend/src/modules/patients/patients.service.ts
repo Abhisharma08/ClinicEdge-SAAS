@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { CreatePatientDto, UpdatePatientDto } from './dto';
+import { CreatePatientDto, UpdatePatientDto, QuickCreatePatientDto } from './dto';
 import { PaginationDto, createPaginatedResult } from '../../common/dto';
 import { encrypt, decrypt } from '../../common/utils/encryption.util';
 
@@ -263,6 +263,64 @@ export class PatientsService {
                 data: { lastVisit: new Date() },
             });
         }
+    }
+
+    async quickCreate(dto: QuickCreatePatientDto, clinicId: string) {
+        // Check for existing patient by phone
+        const existing = await this.prisma.patient.findUnique({
+            where: { phone: dto.phone },
+        });
+
+        if (existing) {
+            // Reactivate if soft-deleted
+            if (existing.deletedAt) {
+                await this.prisma.patient.update({
+                    where: { id: existing.id },
+                    data: {
+                        deletedAt: null,
+                        isActive: true,
+                        ...(dto.name && { name: dto.name }),
+                    },
+                });
+            }
+
+            // Link existing patient to this clinic
+            await this.linkToClinic(existing.id, clinicId);
+            return existing;
+        }
+
+        // Create new patient with minimal data
+        const patient = await this.prisma.patient.create({
+            data: {
+                name: dto.name,
+                phone: dto.phone,
+                phoneEncrypted: encrypt(dto.phone, this.encryptionKey),
+                email: dto.email || null,
+            },
+        });
+
+        // Link to clinic
+        await this.linkToClinic(patient.id, clinicId);
+
+        return patient;
+    }
+
+    async findByPhone(phone: string, clinicId: string) {
+        return this.prisma.patient.findFirst({
+            where: {
+                phone,
+                deletedAt: null,
+                patientClinics: { some: { clinicId } },
+            },
+            select: {
+                id: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+                email: true,
+            },
+        });
     }
 
     async delete(id: string) {

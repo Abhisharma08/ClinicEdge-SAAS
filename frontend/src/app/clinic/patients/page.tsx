@@ -6,7 +6,7 @@ import { api } from '@/lib/api'
 import {
     Users, Plus, Edit2, FileClock, Search, Trash2, Download, Upload,
     X, ChevronLeft, ChevronRight, Check, AlertCircle,
-    ChevronUp, ChevronDown, Filter, RotateCcw
+    ChevronUp, ChevronDown, Filter, RotateCcw, Calendar
 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 
@@ -656,6 +656,10 @@ function PatientsPageContent() {
                                     </td>
                                     <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => router.push(`/clinic/appointments?bookFor=${p.id}`)}
+                                                className="p-1.5 hover:bg-green-50 rounded-md text-gray-500 hover:text-green-600" title="Book Appointment">
+                                                <Calendar className="w-4 h-4" />
+                                            </button>
                                             <button onClick={() => router.push(`/clinic/patients/${p.id}`)}
                                                 className="p-1.5 hover:bg-gray-100 rounded-md text-gray-500 hover:text-gray-700" title="View History">
                                                 <FileClock className="w-4 h-4" />

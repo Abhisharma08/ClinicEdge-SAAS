@@ -18,7 +18,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagg
 import { Response } from 'express';
 import { PatientsService } from './patients.service';
 import { ImportExportService } from './import-export.service';
-import { CreatePatientDto, UpdatePatientDto } from './dto';
+import { CreatePatientDto, UpdatePatientDto, QuickCreatePatientDto } from './dto';
 import { Roles, CurrentUser, CurrentUserData } from '../../common/decorators';
 import { UserRole } from '@prisma/client';
 import { PaginationDto } from '../../common/dto';
@@ -43,6 +43,36 @@ export class PatientsController {
             throw new ForbiddenException('User must be associated with a clinic');
         }
         return this.patientsService.create(dto, user.clinicId);
+    }
+
+    @Post('quick')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.DOCTOR)
+    @ApiOperation({ summary: 'Quick-create patient with minimal fields' })
+    async quickCreate(
+        @Body() dto: QuickCreatePatientDto,
+        @CurrentUser() user: CurrentUserData,
+    ) {
+        if (!user.clinicId) {
+            throw new ForbiddenException('User must be associated with a clinic');
+        }
+        return this.patientsService.quickCreate(dto, user.clinicId);
+    }
+
+    @Get('search-phone')
+    @Roles(UserRole.CLINIC_ADMIN, UserRole.DOCTOR)
+    @ApiOperation({ summary: 'Search patient by phone number' })
+    async searchByPhone(
+        @Query('phone') phone: string,
+        @CurrentUser() user: CurrentUserData,
+    ) {
+        if (!user.clinicId) {
+            throw new ForbiddenException('User must be associated with a clinic');
+        }
+        if (!phone) {
+            throw new BadRequestException('Phone number is required');
+        }
+        const patient = await this.patientsService.findByPhone(phone, user.clinicId);
+        return patient || null;
     }
 
     @Get()

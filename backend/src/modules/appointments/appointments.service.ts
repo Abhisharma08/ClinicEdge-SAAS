@@ -47,6 +47,23 @@ export class AppointmentsService {
                 }
             }
 
+            // Resolve patientId from patientData if needed
+            if (!dto.patientId && dto.patientData) {
+                const patient = await this.patientsService.quickCreate(
+                    {
+                        name: dto.patientData.name,
+                        phone: dto.patientData.phone,
+                        email: dto.patientData.email,
+                    },
+                    dto.clinicId,
+                );
+                dto.patientId = patient.id;
+            }
+
+            if (!dto.patientId) {
+                throw new BadRequestException('Either patientId or patientData must be provided');
+            }
+
             const appointmentDate = new Date(dto.appointmentDate);
 
             // Validate future date
@@ -211,7 +228,7 @@ export class AppointmentsService {
                     doctor: { select: { id: true, name: true } },
                     specialist: { select: { id: true, name: true } },
                 },
-                orderBy: [{ appointmentDate: 'asc' }, { startTime: 'asc' }],
+                orderBy: [{ appointmentDate: 'desc' }, { startTime: 'desc' }],
             }),
             this.prisma.appointment.count({ where }),
         ]);

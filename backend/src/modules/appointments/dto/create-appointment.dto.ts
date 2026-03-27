@@ -3,18 +3,44 @@ import {
     IsString,
     IsOptional,
     IsDateString,
+    IsEmail,
     Matches,
+    ValidateNested,
+    ValidateIf,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class InlinePatientData {
+    @ApiProperty({ example: 'Amit Kumar' })
+    @IsString()
+    name: string;
+
+    @ApiProperty({ example: '+919876500001' })
+    @Matches(/^\+?[1-9]\d{1,14}$/, { message: 'Invalid phone number format' })
+    phone: string;
+
+    @ApiPropertyOptional({ example: 'patient@example.com' })
+    @IsOptional()
+    @IsEmail()
+    email?: string;
+}
 
 export class CreateAppointmentDto {
     @ApiProperty({ description: 'Clinic ID' })
     @IsUUID()
     clinicId: string;
 
-    @ApiProperty({ description: 'Patient ID' })
+    @ApiPropertyOptional({ description: 'Patient ID (required if patientData not provided)' })
+    @ValidateIf((o) => !o.patientData)
     @IsUUID()
-    patientId: string;
+    patientId?: string;
+
+    @ApiPropertyOptional({ description: 'Inline patient data for quick creation (used if patientId not provided)' })
+    @ValidateIf((o) => !o.patientId)
+    @ValidateNested()
+    @Type(() => InlinePatientData)
+    patientData?: InlinePatientData;
 
     @ApiProperty({ description: 'Doctor ID' })
     @IsUUID()
@@ -51,3 +77,4 @@ export class CreateAppointmentDto {
     @IsString()
     idempotencyKey?: string;
 }
+
