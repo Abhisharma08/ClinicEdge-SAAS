@@ -39,8 +39,8 @@ export default function SuperAdminLayout({
     }, [])
 
     function handleLogout() {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('user')
+        localStorage.clear()
+        sessionStorage.clear()
         router.push('/login')
     }
 

@@ -51,7 +51,7 @@ export default function DoctorDashboardLayout({ children }: { children: React.Re
                     ))}
                 </nav>
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-800">
-                    <button onClick={() => { localStorage.clear(); router.push('/login'); }} className="flex items-center space-x-3 px-3 py-2 w-full text-red-400 hover:bg-red-900/20 rounded-lg">
+                    <button onClick={() => { localStorage.clear(); sessionStorage.clear(); router.push('/login'); }} className="flex items-center space-x-3 px-3 py-2 w-full text-red-400 hover:bg-red-900/20 rounded-lg">
                         <LogOut className="w-5 h-5" /><span>Logout</span>
                     </button>
                 </div>

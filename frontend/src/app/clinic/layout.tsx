@@ -50,8 +50,8 @@ export default function ClinicDashboardLayout({
     }, [])
 
     function handleLogout() {
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('user')
+        localStorage.clear()
+        sessionStorage.clear()
         router.push('/login')
     }
 

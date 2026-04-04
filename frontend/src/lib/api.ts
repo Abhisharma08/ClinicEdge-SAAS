@@ -20,8 +20,8 @@ class ApiClient {
     clearToken() {
         this.token = null
         if (typeof window !== 'undefined') {
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('user')
+            localStorage.clear()
+            sessionStorage.clear()
         }
     }
 
