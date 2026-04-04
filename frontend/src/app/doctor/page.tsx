@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
-import { Calendar, Users, Clock, CheckCircle, Plus, X } from 'lucide-react'
+import { Calendar, Users, Clock, CheckCircle, Plus, X, Search, UserPlus, Loader2 } from 'lucide-react'
 
 export default function DoctorDashboardPage() {
     const [stats, setStats] = useState({ todayAppointments: 0, pending: 0, completed: 0, totalPatients: 0 })
@@ -152,7 +152,16 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
     const [slots, setSlots] = useState<any[]>([])
     const [loadingSlots, setLoadingSlots] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    
+    // Patient selection state
+    const [patientMode, setPatientMode] = useState<'search' | 'existing' | 'new'>('search')
+    const [phoneSearch, setPhoneSearch] = useState('')
+    const [phoneSearchLoading, setPhoneSearchLoading] = useState(false)
+    const [foundPatient, setFoundPatient] = useState<any>(null)
+    const [newPatientName, setNewPatientName] = useState('')
+    const [newPatientEmail, setNewPatientEmail] = useState('')
     const [patientSearch, setPatientSearch] = useState('')
+
     const [formData, setFormData] = useState({
         patientId: '',
         appointmentDate: new Date().toISOString().split('T')[0],
@@ -163,7 +172,7 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
     useEffect(() => {
         if (isOpen) {
             fetchInitialData()
-            setPatientSearch('')
+            resetForm()
         }
     }, [isOpen])
 
@@ -172,6 +181,34 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
             fetchSlots()
         }
     }, [isOpen, doctorId, formData.appointmentDate])
+
+    // Phone search with debounce
+    useEffect(() => {
+        if (patientMode !== 'search' || !phoneSearch || phoneSearch.length < 4) {
+            setFoundPatient(null)
+            return
+        }
+
+        const timer = setTimeout(async () => {
+            setPhoneSearchLoading(true)
+            try {
+                const result = await api.get<any>(`/patients/search-phone?phone=${encodeURIComponent(phoneSearch)}`)
+                if (result && result.id) {
+                    setFoundPatient(result)
+                    setPatientMode('existing')
+                    setFormData(prev => ({ ...prev, patientId: result.id }))
+                } else {
+                    setFoundPatient(null)
+                }
+            } catch {
+                setFoundPatient(null)
+            } finally {
+                setPhoneSearchLoading(false)
+            }
+        }, 500)
+
+        return () => clearTimeout(timer)
+    }, [phoneSearch, patientMode])
 
     async function fetchInitialData() {
         try {
@@ -187,14 +224,9 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
             const profile = await api.get<any>('/doctors/profile/me')
             const clinicId = profile.clinics?.[0]?.id
 
-            console.log('Fetching slots for:', { clinicId, doctorId, date: formData.appointmentDate })
-
             if (clinicId && doctorId) {
                 const res = await api.get<any[]>(`/appointments/slots?clinicId=${clinicId}&doctorId=${doctorId}&date=${formData.appointmentDate}`)
-                console.log('Slots response:', res)
                 setSlots(res || [])
-            } else {
-                console.warn('Missing clinicId or doctorId', { clinicId, doctorId })
             }
         } catch (error) {
             console.error('Failed to load slots', error)
@@ -216,22 +248,50 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
             const selectedSlot = slots.find(s => s.start === formData.startTime)
             const endTime = selectedSlot ? selectedSlot.end : addMinutes(formData.startTime, 15)
 
-            await api.post('/appointments', {
+            const payload: any = {
                 clinicId,
-                patientId: formData.patientId,
                 doctorId: doctorId,
                 appointmentDate: formData.appointmentDate,
                 startTime: formData.startTime,
                 endTime: endTime,
                 notes: formData.notes
-            })
+            }
+
+            if (patientMode === 'new') {
+                payload.patientData = {
+                    name: newPatientName,
+                    phone: phoneSearch,
+                    email: newPatientEmail || undefined,
+                }
+            } else {
+                payload.patientId = formData.patientId
+            }
+
+            await api.post('/appointments', payload)
             onSuccess()
         } catch (error: any) {
             console.error(error)
-            alert(error.message || 'Failed to book appointment')
+            const msg = error.response?.data?.message || error.message || 'Failed to book appointment'
+            alert(Array.isArray(msg) ? msg.join('\n') : msg)
         } finally {
             setSubmitting(false)
         }
+    }
+
+    function resetForm() {
+        setFormData({
+            patientId: '',
+            appointmentDate: new Date().toISOString().split('T')[0],
+            startTime: '',
+            notes: ''
+        })
+        setSlots([])
+        setPatientMode('search')
+        setPhoneSearch('')
+        setFoundPatient(null)
+        setNewPatientName('')
+        setNewPatientEmail('')
+        setPatientSearch('')
     }
 
     function addMinutes(time: string, mins: number) {
@@ -242,55 +302,197 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     }
 
-    const filteredPatients = patients.filter(p => {
-        if (!patientSearch) return true
-        const search = patientSearch.toLowerCase()
-        const fullName = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
-        return fullName.toLowerCase().includes(search)
-            || (p.phone || '').includes(patientSearch)
-            || (p.email || '').toLowerCase().includes(search)
-    })
+    function getPatientDisplayName(p: any) {
+        if (!p) return 'Unknown'
+        if (p.firstName && p.lastName) return `${p.firstName} ${p.lastName}`
+        return p.name || 'Unknown'
+    }
+
+    const isSubmitDisabled = () => {
+        if (submitting) return true
+        if (!formData.appointmentDate || !formData.startTime) return true
+        if (patientMode === 'new') {
+            if (!newPatientName.trim() || !phoneSearch.trim()) return true
+        } else if (patientMode === 'existing') {
+            if (!formData.patientId) return true
+        } else {
+            return true
+        }
+        return false
+    }
 
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200 my-8">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-gray-900">Book Appointment</h2>
-                    <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+                    <button onClick={onClose}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Patient Selection Section */}
                     <div>
                         <label className="block text-sm font-medium mb-1">Patient</label>
-                        <input
-                            type="text"
-                            placeholder="Search by name, phone or email..."
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 mb-2"
-                            value={patientSearch}
-                            onChange={e => setPatientSearch(e.target.value)}
-                        />
-                        {patientSearch && (
-                            <p className="text-xs text-gray-500 mb-1">{filteredPatients.length} patient{filteredPatients.length !== 1 ? 's' : ''} found</p>
+                        {patientMode === 'existing' && foundPatient ? (
+                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-semibold">
+                                        {getPatientDisplayName(foundPatient).charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900">{getPatientDisplayName(foundPatient)}</p>
+                                        <p className="text-xs text-gray-500">{foundPatient.phone}{foundPatient.email ? ` · ${foundPatient.email}` : ''}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPatientMode('search')
+                                        setPhoneSearch('')
+                                        setFoundPatient(null)
+                                        setFormData(prev => ({ ...prev, patientId: '' }))
+                                    }}
+                                    className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                >
+                                    Change
+                                </button>
+                            </div>
+                        ) : patientMode === 'new' ? (
+                            <div className="p-3 border border-blue-200 bg-blue-50 rounded-lg space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-blue-700">
+                                        <UserPlus className="w-4 h-4" />
+                                        <span className="text-sm font-medium">Quick Register New Patient</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPatientMode('search')
+                                            setNewPatientName('')
+                                            setNewPatientEmail('')
+                                        }}
+                                        className="text-xs text-gray-500 hover:text-red-600"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                <div className="text-xs text-gray-500 bg-white/60 rounded px-2 py-1.5">
+                                    Phone: <span className="font-mono font-medium text-gray-700">{phoneSearch}</span>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Name <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        className="input w-full"
+                                        value={newPatientName}
+                                        onChange={e => setNewPatientName(e.target.value)}
+                                        placeholder="Patient full name"
+                                        autoFocus
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Email <span className="text-gray-400">(optional)</span></label>
+                                    <input
+                                        type="email"
+                                        className="input w-full"
+                                        value={newPatientEmail}
+                                        onChange={e => setNewPatientEmail(e.target.value)}
+                                        placeholder="patient@example.com"
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by phone number (e.g. +919876...)"
+                                        className="input w-full pl-9 pr-10"
+                                        value={phoneSearch}
+                                        onChange={e => setPhoneSearch(e.target.value)}
+                                    />
+                                    {phoneSearchLoading && (
+                                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500 animate-spin" />
+                                    )}
+                                </div>
+                                {phoneSearch.length >= 4 && !phoneSearchLoading && !foundPatient && (
+                                    <div className="flex items-center justify-between p-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+                                        <p className="text-sm text-amber-800">No patient found with this number</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPatientMode('new')}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                                        >
+                                            <UserPlus className="w-3.5 h-3.5" />
+                                            Quick Register
+                                        </button>
+                                    </div>
+                                )}
+                                <details className="group">
+                                    <summary className="text-xs text-primary-600 cursor-pointer hover:text-primary-700 select-none">
+                                        Or select from existing patients
+                                    </summary>
+                                    <div className="mt-2 space-y-2">
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Filter by name, phone or email..."
+                                                className="input w-full pl-9"
+                                                value={patientSearch}
+                                                onChange={e => setPatientSearch(e.target.value)}
+                                            />
+                                        </div>
+                                        {(() => {
+                                            const filtered = patients.filter(p => {
+                                                if (!patientSearch) return true
+                                                const search = patientSearch.toLowerCase()
+                                                const fullName = (p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : (p.name || '')
+                                                return fullName.toLowerCase().includes(search)
+                                                    || (p.phone || '').includes(patientSearch)
+                                                    || (p.email || '').toLowerCase().includes(search)
+                                            })
+                                            return (
+                                                <>
+                                                    {patientSearch && (
+                                                        <p className="text-xs text-gray-500">{filtered.length} patient{filtered.length !== 1 ? 's' : ''} found</p>
+                                                    )}
+                                                    <select
+                                                        className="input w-full"
+                                                        value={formData.patientId}
+                                                        onChange={e => {
+                                                            const pid = e.target.value
+                                                            setFormData(prev => ({ ...prev, patientId: pid }))
+                                                            if (pid) {
+                                                                const p = patients.find(p => p.id === pid)
+                                                                setFoundPatient(p)
+                                                                setPatientMode('existing')
+                                                            }
+                                                        }}
+                                                        size={Math.min(Math.max(filtered.length + 1, 2), 6)}
+                                                    >
+                                                        <option value="">Select Patient</option>
+                                                        {filtered.map(p => (
+                                                            <option key={p.id} value={p.id}>
+                                                                {(p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </>
+                                            )
+                                        })()}
+                                    </div>
+                                </details>
+                            </div>
                         )}
-                        <select
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
-                            value={formData.patientId}
-                            onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-                            required
-                            size={patientSearch ? Math.min(Math.max(filteredPatients.length + 1, 2), 6) : 1}
-                        >
-                            <option value="">Select Patient</option>
-                            {filteredPatients.map(p => (
-                                <option key={p.id} value={p.id}>{(p.firstName && p.lastName) ? `${p.firstName} ${p.lastName}` : p.name} ({p.phone})</option>
-                            ))}
-                        </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Date</label>
                         <input
                             type="date"
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
+                            className="input w-full"
                             value={formData.appointmentDate}
                             onChange={e => setFormData({ ...formData, appointmentDate: e.target.value, startTime: '' })}
                             required
@@ -310,11 +512,11 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                                         type="button"
                                         disabled={!slot.available}
                                         onClick={() => setFormData({ ...formData, startTime: slot.start })}
-                                        className={`px-2 py-1 text-sm rounded border ${formData.startTime === slot.start
+                                        className={`px-2 py-1.5 text-sm rounded-lg border transition-colors ${formData.startTime === slot.start
                                             ? 'bg-primary-600 text-white border-primary-600'
                                             : slot.available
                                                 ? 'bg-white text-gray-700 border-gray-200 hover:border-primary-500'
-                                                : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
+                                                : 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
                                             }`}
                                     >
                                         {slot.start}
@@ -327,25 +529,25 @@ function BookAppointmentModal({ isOpen, onClose, doctorId, onSuccess }: { isOpen
                     <div>
                         <label className="block text-sm font-medium mb-1">Notes</label>
                         <textarea
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500"
+                            className="input w-full"
                             rows={3}
                             value={formData.notes}
                             onChange={e => setFormData({ ...formData, notes: e.target.value })}
                         />
                     </div>
                     <div className="flex justify-end gap-3 pt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
                         <button
                             type="submit"
-                            disabled={submitting || !formData.startTime}
-                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                            disabled={isSubmitDisabled()}
+                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                         >
-                            {submitting ? 'Book' : 'Book'}
+                            {submitting ? 'Booking...' : 'Book Appointment'}
                         </button>
                     </div>
                 </form>
-            </div >
-        </div >
+            </div>
+        </div>
     )
 }
 
