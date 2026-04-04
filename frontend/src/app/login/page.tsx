@@ -136,12 +136,6 @@ export default function LoginPage() {
                     </form>
                 </div>
 
-                <p className="text-center mt-6 text-gray-600">
-                    Need to book an appointment?{' '}
-                    <Link href="/book" className="text-primary-600 hover:underline font-medium">
-                        Book Now
-                    </Link>
-                </p>
             </div>
         </div>
     )
